@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react'
-import { Type, Heading1, Heading2, Heading3, CheckSquare, List, ListOrdered, Code, Minus } from 'lucide-react'
+import { Type, Heading1, Heading2, Heading3, CheckSquare, List, ListOrdered, Code, Minus, type LucideIcon } from 'lucide-react'
 import type { Block } from '@/lib/api'
 
-const BLOCK_TYPES: Array<{ type: Block['type']; label: string; icon: React.FC<{ size?: number }> }> = [
+const BLOCK_TYPES: Array<{ type: Block['type']; label: string; icon: LucideIcon }> = [
   { type: 'text', label: 'Text', icon: Type },
   { type: 'h1', label: 'Heading 1', icon: Heading1 },
   { type: 'h2', label: 'Heading 2', icon: Heading2 },

@@ -164,7 +164,7 @@ export const tasks = {
     return get<{ tasks: Task[] }>(`/api/tasks?${qs}`)
   },
   get: (id: string) => get<Task>(`/api/tasks/${id}`),
-  create: (b: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'subtasks' | 'comments'> & { workspaceId: string }) => post<Task>('/api/tasks', b),
+  create: (b: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'subtasks' | 'comments' | 'workspace_id'> & { workspaceId: string }) => post<Task>('/api/tasks', b),
   update: (id: string, b: Partial<Task>) => patch<Task>(`/api/tasks/${id}`, b),
   delete: (id: string) => del(`/api/tasks/${id}`),
   subtasks: {
