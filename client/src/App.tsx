@@ -3,7 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext'
 import { Layout } from '@/components/layout/Layout'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
+import { AuthPage } from '@/pages/AuthPage'
 import { HomePage } from '@/pages/HomePage'
 import { TasksView } from '@/pages/TasksView'
 import { AudioView } from '@/pages/AudioView'
@@ -21,7 +23,11 @@ export default function App() {
       <WorkspaceProvider>
         <BrowserRouter>
           <Routes>
-            <Route element={<Layout />}>
+            {/* Public */}
+            <Route path="/auth" element={<AuthPage />} />
+
+            {/* Protected — all inside Layout */}
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<HomePage />} />
               <Route path="/tasks" element={<TasksView />} />
               <Route path="/audio" element={<AudioView />} />
@@ -32,8 +38,9 @@ export default function App() {
               <Route path="/users" element={<UsersPage />} />
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/admin/config" element={<ConfigMatrixPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </WorkspaceProvider>

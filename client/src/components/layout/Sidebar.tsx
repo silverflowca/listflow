@@ -2,10 +2,11 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Home, FileText, Database, CheckSquare, Mic, Settings,
-  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle
+  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle, LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 import { HelpModal } from '@/components/ui/HelpModal'
 
@@ -26,7 +27,13 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const { workspaceList, activeWorkspace, setActiveWorkspace } = useWorkspace()
+  const { user, signOut, isDev } = useAuth()
   const navigate = useNavigate()
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/auth', { replace: true })
+  }
 
   return (
     <aside className={cn(
@@ -154,20 +161,45 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className={cn('px-2 py-2 border-t border-ios-gray-5', !collapsed && activeWorkspace ? 'pb-1' : '')}>
+      <div className="px-2 py-2 border-t border-ios-gray-5 space-y-0.5">
+        {/* Signed-in user */}
+        {!collapsed && user && !isDev && (
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <Avatar name={user.email ?? '?'} size="sm" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-ios-label truncate">
+                {user.user_metadata?.name ?? user.email?.split('@')[0]}
+              </div>
+              <div className="text-[10px] text-ios-gray-2 truncate">{user.email}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Help */}
         <button
           onClick={() => setHelpOpen(true)}
-          className={cn(
-            'flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors w-full',
-            'text-ios-secondary hover:bg-ios-gray-6',
-          )}
+          className="flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors w-full text-ios-secondary hover:bg-ios-gray-6"
           title="Help & Instructions"
         >
           <HelpCircle size={18} className="shrink-0 text-ios-gray-1" />
           {!collapsed && <span>Help</span>}
         </button>
+
+        {/* Sign out (not shown in dev mode) */}
+        {!isDev && (
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors w-full text-ios-secondary hover:bg-red-50 hover:text-ios-red group"
+            title="Sign out"
+          >
+            <LogOut size={18} className="shrink-0 text-ios-gray-1 group-hover:text-ios-red" />
+            {!collapsed && <span>Sign out</span>}
+          </button>
+        )}
+
+        {/* Active workspace label */}
         {!collapsed && activeWorkspace && (
-          <div className="px-2 pt-1 pb-1">
+          <div className="px-2 pt-1 pb-0.5">
             <div className="text-xs text-ios-gray-1 truncate">{activeWorkspace.name}</div>
             <div className="text-xs text-ios-gray-2 capitalize">{activeWorkspace.type}</div>
           </div>
