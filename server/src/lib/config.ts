@@ -10,7 +10,7 @@ const cache = new Map<string, string>()
 
 export async function loadConfigCache(): Promise<void> {
   try {
-    const { data } = await (supabase as any).schema('listflow').from('app_settings').select('key, value')
+    const { data } = await supabase.from('app_settings').select('key, value')
     if (data) {
       for (const row of data as { key: string; value: string }[]) {
         cache.set(row.key, row.value)
@@ -30,16 +30,14 @@ export async function getConfig(key: string): Promise<string | undefined> {
 }
 
 export async function setConfig(key: string, value: string): Promise<void> {
-  await (supabase as any)
-    .schema('listflow')
+  await supabase
     .from('app_settings')
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   cache.set(key, value)
 }
 
 export async function deleteConfig(key: string): Promise<void> {
-  await (supabase as any)
-    .schema('listflow')
+  await supabase
     .from('app_settings')
     .delete()
     .eq('key', key)
