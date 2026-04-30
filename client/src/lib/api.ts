@@ -1,6 +1,8 @@
-// Production (single Railway service): empty string → relative URLs → nginx proxies /api to node
-// Dev: Vite proxy handles /api → localhost:3016, so empty string works there too
-const BASE = import.meta.env.VITE_API_URL ?? ''
+// Production (single Railway service): BASE should be '' (relative URLs) so nginx can proxy /api → node
+// Dev: Vite proxy handles /api → localhost:3016, so '' works there too
+// If VITE_API_URL is set to '/api' (incorrect for single-service), strip it so paths aren't doubled
+const _raw = import.meta.env.VITE_API_URL ?? ''
+const BASE = _raw === '/api' || _raw === '/api/' ? '' : _raw.replace(/\/$/, '')
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
