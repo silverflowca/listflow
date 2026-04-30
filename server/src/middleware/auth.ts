@@ -14,7 +14,7 @@ declare module 'hono' {
   }
 }
 
-export async function requireAuth(c: Context, next: Next): Promise<void> {
+export async function requireAuth(c: Context, next: Next): Promise<Response | void> {
   if (NO_AUTH) {
     // Dev mode: use a fake user ID
     c.set('user', { id: '00000000-0000-0000-0000-000000000000', email: 'dev@listflow.local' })
@@ -24,16 +24,14 @@ export async function requireAuth(c: Context, next: Next): Promise<void> {
 
   const authHeader = c.req.header('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    c.json({ error: 'Unauthorized', code: 'NO_TOKEN' }, 401)
-    return
+    return c.json({ error: 'Unauthorized', code: 'NO_TOKEN' }, 401)
   }
 
   const token = authHeader.slice(7)
   const { data, error } = await supabase.auth.getUser(token)
 
   if (error || !data.user) {
-    c.json({ error: 'Unauthorized', code: 'INVALID_TOKEN' }, 401)
-    return
+    return c.json({ error: 'Unauthorized', code: 'INVALID_TOKEN' }, 401)
   }
 
   c.set('user', { id: data.user.id, email: data.user.email })
