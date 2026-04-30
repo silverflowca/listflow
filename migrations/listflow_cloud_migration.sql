@@ -365,27 +365,49 @@ RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER AS $$
 $$;
 
 -- Authenticated user policies (workspace-scoped)
+-- DROP IF EXISTS first so the file is safe to re-run
+DROP POLICY IF EXISTS "auth_select" ON listflow.workspaces;
+DROP POLICY IF EXISTS "auth_insert" ON listflow.workspaces;
+DROP POLICY IF EXISTS "auth_update" ON listflow.workspaces;
 CREATE POLICY "auth_select" ON listflow.workspaces        FOR SELECT TO authenticated USING (listflow.is_workspace_member(id));
 CREATE POLICY "auth_insert" ON listflow.workspaces        FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
 CREATE POLICY "auth_update" ON listflow.workspaces        FOR UPDATE TO authenticated USING (owner_id = auth.uid());
 
+DROP POLICY IF EXISTS "auth_select" ON listflow.workspace_members;
 CREATE POLICY "auth_select" ON listflow.workspace_members FOR SELECT TO authenticated USING (listflow.is_workspace_member(workspace_id));
 
+DROP POLICY IF EXISTS "auth_select" ON listflow.pages;
+DROP POLICY IF EXISTS "auth_insert" ON listflow.pages;
+DROP POLICY IF EXISTS "auth_update" ON listflow.pages;
+DROP POLICY IF EXISTS "auth_delete" ON listflow.pages;
 CREATE POLICY "auth_select" ON listflow.pages             FOR SELECT TO authenticated USING (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_insert" ON listflow.pages             FOR INSERT TO authenticated WITH CHECK (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_update" ON listflow.pages             FOR UPDATE TO authenticated USING (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_delete" ON listflow.pages             FOR DELETE TO authenticated USING (created_by = auth.uid());
 
+DROP POLICY IF EXISTS "auth_select" ON listflow.blocks;
+DROP POLICY IF EXISTS "auth_insert" ON listflow.blocks;
+DROP POLICY IF EXISTS "auth_update" ON listflow.blocks;
+DROP POLICY IF EXISTS "auth_delete" ON listflow.blocks;
 CREATE POLICY "auth_select" ON listflow.blocks            FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM listflow.pages p WHERE p.id = page_id AND listflow.is_workspace_member(p.workspace_id)));
 CREATE POLICY "auth_insert" ON listflow.blocks            FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM listflow.pages p WHERE p.id = page_id AND listflow.is_workspace_member(p.workspace_id)));
 CREATE POLICY "auth_update" ON listflow.blocks            FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM listflow.pages p WHERE p.id = page_id AND listflow.is_workspace_member(p.workspace_id)));
 CREATE POLICY "auth_delete" ON listflow.blocks            FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM listflow.pages p WHERE p.id = page_id AND listflow.is_workspace_member(p.workspace_id)));
 
+DROP POLICY IF EXISTS "auth_select" ON listflow.tasks;
+DROP POLICY IF EXISTS "auth_insert" ON listflow.tasks;
+DROP POLICY IF EXISTS "auth_update" ON listflow.tasks;
+DROP POLICY IF EXISTS "auth_delete" ON listflow.tasks;
 CREATE POLICY "auth_select" ON listflow.tasks             FOR SELECT TO authenticated USING (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_insert" ON listflow.tasks             FOR INSERT TO authenticated WITH CHECK (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_update" ON listflow.tasks             FOR UPDATE TO authenticated USING (listflow.is_workspace_member(workspace_id));
 CREATE POLICY "auth_delete" ON listflow.tasks             FOR DELETE TO authenticated USING (created_by = auth.uid());
 
+DROP POLICY IF EXISTS "auth_select" ON listflow.subtasks;
+DROP POLICY IF EXISTS "auth_select" ON listflow.comments;
+DROP POLICY IF EXISTS "auth_select" ON listflow.audio_recordings;
+DROP POLICY IF EXISTS "auth_select" ON listflow.transcripts;
+DROP POLICY IF EXISTS "auth_select" ON listflow.agent_runs;
 CREATE POLICY "auth_select" ON listflow.subtasks          FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM listflow.tasks t WHERE t.id = task_id AND listflow.is_workspace_member(t.workspace_id)));
 CREATE POLICY "auth_select" ON listflow.comments          FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM listflow.tasks t WHERE t.id = task_id AND listflow.is_workspace_member(t.workspace_id)));
 CREATE POLICY "auth_select" ON listflow.audio_recordings  FOR SELECT TO authenticated USING (listflow.is_workspace_member(workspace_id));
@@ -393,6 +415,10 @@ CREATE POLICY "auth_select" ON listflow.transcripts       FOR SELECT TO authenti
 CREATE POLICY "auth_select" ON listflow.agent_runs        FOR SELECT TO authenticated USING (listflow.is_workspace_member(workspace_id));
 
 -- App users / groups / config: all authenticated can read
+DROP POLICY IF EXISTS "auth_read" ON listflow.app_users;
+DROP POLICY IF EXISTS "auth_read" ON listflow.user_groups;
+DROP POLICY IF EXISTS "auth_read" ON listflow.group_members;
+DROP POLICY IF EXISTS "auth_read" ON listflow.config_matrix;
 CREATE POLICY "auth_read"   ON listflow.app_users         FOR SELECT TO authenticated USING (true);
 CREATE POLICY "auth_read"   ON listflow.user_groups       FOR SELECT TO authenticated USING (true);
 CREATE POLICY "auth_read"   ON listflow.group_members     FOR SELECT TO authenticated USING (true);
