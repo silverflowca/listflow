@@ -4,10 +4,16 @@
 const _raw = import.meta.env.VITE_API_URL ?? ''
 const BASE = _raw === '/api' || _raw === '/api/' ? '' : _raw.replace(/\/$/, '')
 
+import { supabase } from '@/lib/supabase'
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
   const r = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!r.ok) {
@@ -195,9 +201,12 @@ export const databases = {
 }
 
 export const audio = {
-  upload: (formData: FormData) => {
+  upload: async (formData: FormData) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const headers: Record<string, string> = {}
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
     const url = `${BASE}/api/audio/upload`
-    return fetch(url, { method: 'POST', body: formData }).then(r => r.json()) as Promise<{
+    return fetch(url, { method: 'POST', headers, body: formData }).then(r => r.json()) as Promise<{
       recordingId: string; transcriptId: string | null; rawText: string; runId: string | null; error?: string
     }>
   },
