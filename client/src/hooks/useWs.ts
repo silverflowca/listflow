@@ -36,8 +36,10 @@ export function useWs() {
   }, [])
 
   const connect = useCallback(() => {
+    // Production: same host/port as the page (nginx proxies /ws → node)
+    // Dev: Vite dev server proxies /ws → localhost:3016
     const wsUrl = import.meta.env.VITE_WS_URL
-      ?? (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.hostname + ':3016/ws'
+      ?? (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws'
 
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws

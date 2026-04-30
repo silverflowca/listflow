@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3016'
+// Production (single Railway service): empty string → relative URLs → nginx proxies /api to node
+// Dev: Vite proxy handles /api → localhost:3016, so empty string works there too
+const BASE = import.meta.env.VITE_API_URL ?? ''
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
