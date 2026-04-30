@@ -20,7 +20,9 @@ import usersRouter from './routes/users.js'
 import groupsRouter from './routes/groups.js'
 import configMatrixRouter from './routes/configMatrix.js'
 
-const PORT = Number(process.env.PORT ?? 3016)
+// In single-service Railway deploys, NODE_PORT is always 3016 (internal, nginx proxies to it).
+// Railway's PORT env var is reserved for the public-facing nginx listener.
+const PORT = Number(process.env.NODE_PORT ?? process.env.PORT ?? 3016)
 const ORIGIN = process.env.ALLOWED_ORIGIN ?? 'http://localhost:5186'
 
 const app = new Hono()

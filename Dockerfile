@@ -42,9 +42,10 @@ COPY nginx.conf /etc/nginx/http.d/default.conf
 # supervisord config (manages nginx + node in one container)
 COPY supervisord.conf /etc/supervisord.conf
 
-# Railway sets PORT env var — default 8080
-# nginx listens on $PORT (via envsubst at start); node listens on 3016 internally
+# Railway sets PORT env var for the public-facing port — nginx listens on it.
+# Node always listens on 3016 internally (nginx proxies to it).
 ENV PORT=8080
+ENV NODE_PORT=3016
 
 EXPOSE 8080
 
