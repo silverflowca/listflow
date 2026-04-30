@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Home, FileText, Database, CheckSquare, Mic, Settings,
-  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid
+  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Avatar } from '@/components/ui/Avatar'
+import { HelpModal } from '@/components/ui/HelpModal'
 
 const NAV = [
   { to: '/', icon: Home, label: 'Home', exact: true },
@@ -23,6 +24,7 @@ const ADMIN_NAV = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const { workspaceList, activeWorkspace, setActiveWorkspace } = useWorkspace()
   const navigate = useNavigate()
 
@@ -152,12 +154,27 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      {!collapsed && activeWorkspace && (
-        <div className="px-3 py-3 border-t border-ios-gray-5">
-          <div className="text-xs text-ios-gray-1 truncate">{activeWorkspace.name}</div>
-          <div className="text-xs text-ios-gray-2 capitalize">{activeWorkspace.type}</div>
-        </div>
-      )}
+      <div className={cn('px-2 py-2 border-t border-ios-gray-5', !collapsed && activeWorkspace ? 'pb-1' : '')}>
+        <button
+          onClick={() => setHelpOpen(true)}
+          className={cn(
+            'flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors w-full',
+            'text-ios-secondary hover:bg-ios-gray-6',
+          )}
+          title="Help & Instructions"
+        >
+          <HelpCircle size={18} className="shrink-0 text-ios-gray-1" />
+          {!collapsed && <span>Help</span>}
+        </button>
+        {!collapsed && activeWorkspace && (
+          <div className="px-2 pt-1 pb-1">
+            <div className="text-xs text-ios-gray-1 truncate">{activeWorkspace.name}</div>
+            <div className="text-xs text-ios-gray-2 capitalize">{activeWorkspace.type}</div>
+          </div>
+        )}
+      </div>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </aside>
   )
 }
