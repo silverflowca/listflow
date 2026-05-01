@@ -14,7 +14,7 @@ r.get('/', requireAuth, async (c) => {
     .eq('owner_id', user.id)
     .order('created_at', { ascending: true })
 
-  if (e1) return c.json({ error: e1.message }, 500)
+  if (e1) { console.error('[workspaces/list] e1:', JSON.stringify(e1)); return c.json({ error: e1.message }, 500) }
 
   // 2. Workspaces the user is a member of (but doesn't own)
   const { data: memberRows, error: e2 } = await (lf('workspace_members') as any)

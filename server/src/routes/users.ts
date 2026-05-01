@@ -62,7 +62,10 @@ r.post('/sync', async (c) => {
     }, { onConflict: 'id' })
     .select()
     .single()
-  if (error) return c.json({ error: error.message }, 500)
+  if (error) {
+    console.error('[users/sync] DB error:', JSON.stringify(error))
+    return c.json({ error: error.message }, 500)
+  }
   return c.json(data)
 })
 
