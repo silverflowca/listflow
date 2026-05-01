@@ -44,6 +44,7 @@ COPY supervisord.conf /etc/supervisord.conf
 
 # Railway sets PORT env var for the public-facing port — nginx listens on it.
 # Node always listens on 3016 internally (nginx proxies to it).
+# cache-bust: 2026-05-01
 ENV PORT=8080
 ENV NODE_PORT=3016
 
