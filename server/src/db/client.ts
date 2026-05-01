@@ -10,9 +10,7 @@ if (!key) {
 
 export const supabase = createClient(url, key, {
   auth: { persistSession: false },
-  db: { schema: 'listflow' },
 })
 
-// Typed helper — always queries listflow schema
-// Uses the default schema set on the client (no .schema() call needed, avoids PostgREST schema header issues)
-export const lf = (table: string) => supabase.from(table)
+// Typed helper — queries listflow schema explicitly per-call
+export const lf = (table: string) => supabase.schema('listflow').from(table)
