@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { Users, Plus, Trash2, Check, Pencil } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Users, Plus, Trash2, Check, Pencil, FileText, CheckSquare, Mic, ChevronDown, ChevronUp } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Avatar } from '@/components/ui/Avatar'
 import { Modal } from '@/components/ui/Modal'
-import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { workspaces as workspacesApi, type Workspace } from '@/lib/api'
+import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
+import { workspaces as workspacesApi, pages, tasks, audio, users as usersApi, type Workspace } from '@/lib/api'
 
 export function WorkspacePage() {
   const { workspaceList, activeWorkspace, setActiveWorkspace, createWorkspace, deleteWorkspace, reload } = useWorkspace()
@@ -24,7 +24,7 @@ export function WorkspacePage() {
       <TopBar
         title="Workspaces"
         subtitle="Manage your workspaces"
-        accentColor="#2e7d32"
+        accentColor="var(--ws-color)"
         actions={
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={14} /> New Workspace
@@ -81,18 +81,32 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
   onEdit: () => void
   onDelete: () => void
 }) {
-  const [members, setMembers] = useState<{ user_id: string; role: string }[]>([])
   const [expanded, setExpanded] = useState(false)
+  const [ownerName, setOwnerName] = useState<string | null>(null)
+  const [counts, setCounts] = useState<{ pages: number; tasks: number; recordings: number } | null>(null)
 
+  const palette = workspacePalette(ws)
+
+  // Load owner name once
   useEffect(() => {
-    if (!expanded) return
-    workspacesApi.members.list(ws.id)
-      .then(({ members: m }) => setMembers(m))
-      .catch(() => {})
-  }, [expanded, ws.id])
+    if (!ws.owner_id) return
+    usersApi.get(ws.owner_id)
+      .then(u => setOwnerName(u.name || u.email))
+      .catch(() => setOwnerName(ws.owner_id.slice(0, 8) + '…'))
+  }, [ws.owner_id])
+
+  // Load counts when expanded
+  useEffect(() => {
+    if (!expanded || counts) return
+    Promise.all([
+      pages.list(ws.id).then(r => r.pages.length).catch(() => 0),
+      tasks.list({ workspaceId: ws.id }).then(r => r.tasks.length).catch(() => 0),
+      audio.list(ws.id).then(r => r.recordings.length).catch(() => 0),
+    ]).then(([p, t, a]) => setCounts({ pages: p, tasks: t, recordings: a }))
+  }, [expanded, ws.id, counts])
 
   return (
-    <Card className={isActive ? 'ring-2 ring-[#2e7d32]/40' : ''}>
+    <Card className={isActive ? 'ring-2' : ''} style={isActive ? { '--tw-ring-color': palette.color } as React.CSSProperties : {}}>
       {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-ios-gray-6/30 transition-colors rounded-t-ios-lg"
@@ -100,8 +114,8 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
       >
         {/* Avatar */}
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-base flex-shrink-0 transition-colors"
-          style={{ backgroundColor: isActive ? '#2e7d32' : '#8e8e93' }}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-base flex-shrink-0 transition-colors duration-300"
+          style={{ backgroundColor: palette.color }}
         >
           {ws.icon ?? ws.name.charAt(0).toUpperCase()}
         </div>
@@ -110,13 +124,14 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
           <div className="flex items-center gap-2">
             <span className="font-semibold text-ios-label text-sm truncate">{ws.name}</span>
             {isActive && (
-              <span className="flex items-center gap-0.5 text-xs text-[#2e7d32] font-medium">
+              <span className="flex items-center gap-0.5 text-xs font-medium" style={{ color: palette.color }}>
                 <Check size={11} /> Active
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-ios-gray-3">
             <span className="capitalize">{ws.type}</span>
+            {ownerName && <span>· Owner: <span className="text-ios-gray-2 font-medium">{ownerName}</span></span>}
             {ws.description && <span className="truncate">· {ws.description}</span>}
           </div>
         </div>
@@ -124,7 +139,8 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={e => { e.stopPropagation(); onEdit() }}
-            className="p-1.5 text-ios-gray-2 hover:text-ios-blue hover:bg-blue-50 rounded-lg transition-colors"
+            className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-lg transition-colors"
+            style={{ ['--hover-color' as any]: palette.color }}
             title="Edit"
           >
             <Pencil size={14} />
@@ -136,35 +152,105 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
           >
             <Trash2 size={14} />
           </button>
-          <span className="text-ios-gray-3 text-xs ml-1">{expanded ? '▲' : '▼'}</span>
+          {expanded
+            ? <ChevronUp size={14} className="text-ios-gray-3 ml-1" />
+            : <ChevronDown size={14} className="text-ios-gray-3 ml-1" />
+          }
         </div>
       </div>
 
-      {/* Expanded members */}
+      {/* Expanded panel */}
       {expanded && (
-        <div className="border-t border-ios-gray-6 px-4 py-3">
-          <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-ios-gray-2">
-            <Users size={12} /> Members
+        <div className="border-t border-ios-gray-5 px-4 py-3 space-y-3">
+
+          {/* Quick-link counts */}
+          <div className="grid grid-cols-3 gap-2">
+            <Link
+              to="/pages"
+              onClick={onSelect}
+              className="flex flex-col items-center gap-1 p-2 rounded-ios hover:bg-ios-gray-6 transition-colors group"
+            >
+              <FileText size={16} style={{ color: palette.color }} />
+              <span className="text-sm font-semibold text-ios-label">
+                {counts == null ? '—' : counts.pages}
+              </span>
+              <span className="text-[10px] text-ios-gray-2">Documents</span>
+            </Link>
+            <Link
+              to="/tasks"
+              onClick={onSelect}
+              className="flex flex-col items-center gap-1 p-2 rounded-ios hover:bg-ios-gray-6 transition-colors group"
+            >
+              <CheckSquare size={16} style={{ color: palette.color }} />
+              <span className="text-sm font-semibold text-ios-label">
+                {counts == null ? '—' : counts.tasks}
+              </span>
+              <span className="text-[10px] text-ios-gray-2">Tasks</span>
+            </Link>
+            <Link
+              to="/audio"
+              onClick={onSelect}
+              className="flex flex-col items-center gap-1 p-2 rounded-ios hover:bg-ios-gray-6 transition-colors group"
+            >
+              <Mic size={16} style={{ color: palette.color }} />
+              <span className="text-sm font-semibold text-ios-label">
+                {counts == null ? '—' : counts.recordings}
+              </span>
+              <span className="text-[10px] text-ios-gray-2">Recordings</span>
+            </Link>
           </div>
-          {members.length === 0 ? (
-            <p className="text-xs text-ios-gray-3">No members</p>
-          ) : (
-            <ul className="space-y-1.5">
-              {members.map(m => (
-                <li key={m.user_id} className="flex items-center gap-2">
-                  <Avatar name={m.user_id.slice(0, 4)} size="sm" />
-                  <span className="flex-1 truncate text-xs text-ios-gray-2 font-mono">{m.user_id}</span>
-                  <span className="text-xs text-ios-gray-3 capitalize">{m.role}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-xs text-ios-gray-3 mt-2">
+
+          {/* Members */}
+          <MembersList workspaceId={ws.id} />
+
+          <p className="text-xs text-ios-gray-3">
             Created {new Date(ws.created_at).toLocaleDateString()}
           </p>
         </div>
       )}
     </Card>
+  )
+}
+
+function MembersList({ workspaceId }: { workspaceId: string }) {
+  const [members, setMembers] = useState<{ user_id: string; role: string }[]>([])
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    workspacesApi.members.list(workspaceId)
+      .then(({ members: m }) => {
+        setMembers(m)
+        // Fetch names for each member
+        m.forEach(mem =>
+          usersApi.get(mem.user_id)
+            .then(u => setMemberNames(prev => ({ ...prev, [mem.user_id]: u.name || u.email })))
+            .catch(() => {})
+        )
+      })
+      .catch(() => {})
+  }, [workspaceId])
+
+  if (members.length === 0) return null
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-1.5 text-xs font-medium text-ios-gray-2">
+        <Users size={12} /> Members ({members.length})
+      </div>
+      <ul className="space-y-1">
+        {members.map(m => (
+          <li key={m.user_id} className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-ios-gray-5 flex items-center justify-center text-[10px] font-medium text-ios-gray-1 flex-shrink-0">
+              {(memberNames[m.user_id] ?? m.user_id).charAt(0).toUpperCase()}
+            </div>
+            <span className="flex-1 truncate text-xs text-ios-label">
+              {memberNames[m.user_id] ?? <span className="text-ios-gray-3 font-mono">{m.user_id.slice(0, 8)}…</span>}
+            </span>
+            <span className="text-xs text-ios-gray-3 capitalize">{m.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -197,12 +283,7 @@ function CreateWorkspaceModal({ onClose, onCreate }: {
         {err && <p className="text-sm text-ios-red bg-red-50 p-2 rounded-lg">{err}</p>}
         <div>
           <label className="block text-xs font-medium text-ios-gray-2 mb-1">Name *</label>
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="e.g. My Projects"
-            autoFocus
-          />
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. My Projects" autoFocus />
         </div>
         <div>
           <label className="block text-xs font-medium text-ios-gray-2 mb-1">Type</label>
@@ -267,11 +348,7 @@ function EditWorkspaceModal({ workspace, onClose, onSaved }: {
         </div>
         <div>
           <label className="block text-xs font-medium text-ios-gray-2 mb-1">Description</label>
-          <Input
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Optional"
-          />
+          <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional" />
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>

@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle, LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 import { HelpModal } from '@/components/ui/HelpModal'
@@ -30,6 +30,8 @@ export function Sidebar() {
   const { user, signOut, isDev } = useAuth()
   const navigate = useNavigate()
 
+  const palette = workspacePalette(activeWorkspace)
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/auth', { replace: true })
@@ -41,10 +43,16 @@ export function Sidebar() {
       collapsed ? 'w-14' : 'w-60',
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-ios-gray-5">
+      <div
+        className="flex items-center justify-between px-3 py-3 border-b border-ios-gray-5 transition-colors duration-300"
+        style={{ borderBottomColor: `${palette.color}30` }}
+      >
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-ios-blue rounded-ios flex items-center justify-center">
+            <div
+              className="w-7 h-7 rounded-ios flex items-center justify-center transition-colors duration-300"
+              style={{ backgroundColor: palette.color }}
+            >
               <CheckSquare size={14} className="text-white" />
             </div>
             <span className="font-semibold text-ios-label text-sm">ListFlow</span>
@@ -67,25 +75,36 @@ export function Sidebar() {
               <LayoutGrid size={13} />
             </NavLink>
           </div>
-          {workspaceList.map(ws => (
-            <button
-              key={ws.id}
-              onClick={() => setActiveWorkspace(ws)}
-              className={cn(
-                'w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm transition-colors',
-                activeWorkspace?.id === ws.id
-                  ? 'bg-ios-blue/10 text-ios-blue font-medium'
-                  : 'text-ios-secondary hover:bg-ios-gray-6',
-              )}
-            >
-              <Avatar name={ws.name} size="sm" />
-              <span className="truncate flex-1 text-left">{ws.name}</span>
-              {activeWorkspace?.id === ws.id && <span className="text-[10px] text-ios-blue shrink-0">✓</span>}
-              {ws.type === 'group' && activeWorkspace?.id !== ws.id && (
-                <Users size={11} className="ml-auto text-ios-gray-2 shrink-0" />
-              )}
-            </button>
-          ))}
+          {workspaceList.map(ws => {
+            const isActive = activeWorkspace?.id === ws.id
+            const wsPalette = workspacePalette(ws)
+            return (
+              <button
+                key={ws.id}
+                onClick={() => setActiveWorkspace(ws)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm transition-colors',
+                  isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
+                )}
+                style={isActive ? {
+                  backgroundColor: wsPalette.light,
+                  color: wsPalette.color,
+                } : {}}
+              >
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 transition-colors duration-300"
+                  style={{ backgroundColor: wsPalette.color }}
+                >
+                  {ws.icon ?? ws.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="truncate flex-1 text-left">{ws.name}</span>
+                {isActive && <span className="text-[10px] shrink-0" style={{ color: wsPalette.color }}>✓</span>}
+                {ws.type === 'group' && !isActive && (
+                  <Users size={11} className="ml-auto text-ios-gray-2 shrink-0" />
+                )}
+              </button>
+            )
+          })}
           <NavLink
             to="/workspace"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
@@ -105,10 +124,12 @@ export function Sidebar() {
             end={exact}
             className={({ isActive }) => cn(
               'flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors',
-              isActive
-                ? 'bg-ios-blue/10 text-ios-blue font-medium'
-                : 'text-ios-secondary hover:bg-ios-gray-6',
+              isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
             )}
+            style={({ isActive }) => isActive ? {
+              backgroundColor: 'var(--ws-color-light)',
+              color: 'var(--ws-color)',
+            } : {}}
           >
             <Icon size={18} className="shrink-0" />
             {!collapsed && <span>{label}</span>}
@@ -128,8 +149,12 @@ export function Sidebar() {
               to="/pages"
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-2 py-1.5 rounded-ios text-sm transition-colors',
-                isActive ? 'bg-ios-blue/10 text-ios-blue' : 'text-ios-secondary hover:bg-ios-gray-6',
+                isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
               )}
+              style={({ isActive }) => isActive ? {
+                backgroundColor: 'var(--ws-color-light)',
+                color: 'var(--ws-color)',
+              } : {}}
             >
               <Folder size={16} />
               <span>All Pages</span>
@@ -161,7 +186,10 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-2 py-2 border-t border-ios-gray-5 space-y-0.5">
+      <div
+        className="px-2 py-2 border-t border-ios-gray-5 space-y-0.5 transition-colors duration-300"
+        style={{ borderTopColor: `${palette.color}30` }}
+      >
         {/* Signed-in user */}
         {!collapsed && user && !isDev && (
           <div className="flex items-center gap-2 px-2 py-1.5">
@@ -185,7 +213,7 @@ export function Sidebar() {
           {!collapsed && <span>Help</span>}
         </button>
 
-        {/* Sign out (not shown in dev mode) */}
+        {/* Sign out */}
         {!isDev && (
           <button
             onClick={handleSignOut}
@@ -200,7 +228,7 @@ export function Sidebar() {
         {/* Active workspace label */}
         {!collapsed && activeWorkspace && (
           <div className="px-2 pt-1 pb-0.5">
-            <div className="text-xs text-ios-gray-1 truncate">{activeWorkspace.name}</div>
+            <div className="text-xs font-medium truncate" style={{ color: palette.color }}>{activeWorkspace.name}</div>
             <div className="text-xs text-ios-gray-2 capitalize">{activeWorkspace.type}</div>
           </div>
         )}
