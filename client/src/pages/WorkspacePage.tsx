@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, Plus, Trash2, Check, Pencil, FileText, CheckSquare, Mic, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Users, Plus, Trash2, Check, Pencil, FileText, CheckSquare, Mic,
+  ChevronDown, ChevronUp, FolderOpen, Folder, FolderPlus,
+} from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
-import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
+import { useWorkspace, workspacePalette, type WorkspaceNode } from '@/contexts/WorkspaceContext'
 import { workspaces as workspacesApi, pages, tasks, audio, users as usersApi, type Workspace } from '@/lib/api'
 
 export function WorkspacePage() {
-  const { workspaceList, activeWorkspace, setActiveWorkspace, createWorkspace, deleteWorkspace, reload } = useWorkspace()
+  const { workspaceTree, activeWorkspace, setActiveWorkspace, createWorkspace, createFolder, deleteWorkspace, reload } = useWorkspace()
   const [createOpen, setCreateOpen] = useState(false)
   const [editWs, setEditWs] = useState<Workspace | null>(null)
+  const [newFolderParent, setNewFolderParent] = useState<Workspace | null>(null)
 
   async function handleDelete(ws: Workspace) {
-    if (!confirm(`Delete workspace "${ws.name}"? This cannot be undone.`)) return
+    if (!confirm(`Delete "${ws.name}"? All subfolders and content will be deleted too. This cannot be undone.`)) return
     await deleteWorkspace(ws.id)
   }
 
@@ -23,7 +27,7 @@ export function WorkspacePage() {
     <div className="flex flex-col h-full">
       <TopBar
         title="Workspaces"
-        subtitle="Manage your workspaces"
+        subtitle="Manage your workspaces and folders"
         accentColor="var(--ws-color)"
         actions={
           <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -32,21 +36,23 @@ export function WorkspacePage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-3 max-w-2xl">
-        {workspaceList.length === 0 && (
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-2xl">
+        {workspaceTree.length === 0 && (
           <div className="text-center py-12 text-ios-gray-3">
             <p className="text-sm">No workspaces yet. Create one to get started.</p>
           </div>
         )}
 
-        {workspaceList.map(ws => (
-          <WorkspaceCard
-            key={ws.id}
-            workspace={ws}
-            isActive={activeWorkspace?.id === ws.id}
-            onSelect={() => setActiveWorkspace(ws)}
-            onEdit={() => setEditWs(ws)}
-            onDelete={() => handleDelete(ws)}
+        {workspaceTree.map(node => (
+          <WorkspaceTreeCard
+            key={node.id}
+            node={node}
+            depth={0}
+            activeWorkspace={activeWorkspace}
+            onSelect={setActiveWorkspace}
+            onEdit={setEditWs}
+            onDelete={handleDelete}
+            onCreateSubfolder={setNewFolderParent}
           />
         ))}
       </div>
@@ -68,18 +74,79 @@ export function WorkspacePage() {
           onSaved={() => { setEditWs(null); reload() }}
         />
       )}
+
+      {newFolderParent && (
+        <CreateFolderModal
+          parent={newFolderParent}
+          onClose={() => setNewFolderParent(null)}
+          onCreate={async (name) => {
+            await createFolder(name, newFolderParent.id)
+            setNewFolderParent(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Recursive workspace/folder card ───────────────────────────────────────────
+
+function WorkspaceTreeCard({
+  node,
+  depth,
+  activeWorkspace,
+  onSelect,
+  onEdit,
+  onDelete,
+  onCreateSubfolder,
+}: {
+  node: WorkspaceNode
+  depth: number
+  activeWorkspace: Workspace | null
+  onSelect: (w: Workspace) => void
+  onEdit: (w: Workspace) => void
+  onDelete: (w: Workspace) => void
+  onCreateSubfolder: (w: Workspace) => void
+}) {
+  return (
+    <div className={depth > 0 ? 'ml-6 border-l-2 border-ios-gray-5 pl-3' : ''}>
+      <WorkspaceCard
+        workspace={node}
+        isActive={activeWorkspace?.id === node.id}
+        onSelect={() => onSelect(node)}
+        onEdit={() => onEdit(node)}
+        onDelete={() => onDelete(node)}
+        onCreateSubfolder={() => onCreateSubfolder(node)}
+      />
+      {node.children.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {node.children.map(child => (
+            <WorkspaceTreeCard
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              activeWorkspace={activeWorkspace}
+              onSelect={onSelect}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onCreateSubfolder={onCreateSubfolder}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Workspace card ─────────────────────────────────────────────────────────────
 
-function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: {
+function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete, onCreateSubfolder }: {
   workspace: Workspace
   isActive: boolean
   onSelect: () => void
   onEdit: () => void
   onDelete: () => void
+  onCreateSubfolder: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [ownerName, setOwnerName] = useState<string | null>(null)
@@ -105,6 +172,8 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
     ]).then(([p, t, a]) => setCounts({ pages: p, tasks: t, recordings: a }))
   }, [expanded, ws.id, counts])
 
+  const isFolder = !!ws.parent_id
+
   return (
     <Card className={isActive ? 'ring-2' : ''} style={isActive ? { '--tw-ring-color': palette.color } as React.CSSProperties : {}}>
       {/* Header */}
@@ -114,10 +183,10 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
       >
         {/* Avatar */}
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-base flex-shrink-0 transition-colors duration-300"
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 transition-colors duration-300"
           style={{ backgroundColor: palette.color }}
         >
-          {ws.icon ?? ws.name.charAt(0).toUpperCase()}
+          {ws.icon ?? (isFolder ? '📁' : ws.name.charAt(0).toUpperCase())}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -127,6 +196,9 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
               <span className="flex items-center gap-0.5 text-xs font-medium" style={{ color: palette.color }}>
                 <Check size={11} /> Active
               </span>
+            )}
+            {isFolder && (
+              <span className="text-xs text-ios-gray-2 bg-ios-gray-6 rounded px-1.5 py-0.5">Subfolder</span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-ios-gray-3">
@@ -138,9 +210,15 @@ function WorkspaceCard({ workspace: ws, isActive, onSelect, onEdit, onDelete }: 
 
         <div className="flex items-center gap-1 shrink-0">
           <button
+            onClick={e => { e.stopPropagation(); onCreateSubfolder() }}
+            className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-lg transition-colors"
+            title="New Subfolder"
+          >
+            <FolderPlus size={14} />
+          </button>
+          <button
             onClick={e => { e.stopPropagation(); onEdit() }}
             className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-lg transition-colors"
-            style={{ ['--hover-color' as any]: palette.color }}
             title="Edit"
           >
             <Pencil size={14} />
@@ -308,6 +386,51 @@ function CreateWorkspaceModal({ onClose, onCreate }: {
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// ── Create subfolder modal ─────────────────────────────────────────────────────
+
+function CreateFolderModal({ parent, onClose, onCreate }: {
+  parent: Workspace
+  onClose: () => void
+  onCreate: (name: string) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const palette = workspacePalette(parent)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return setErr('Name is required')
+    setSaving(true)
+    try {
+      await onCreate(name.trim())
+    } catch (ex: any) {
+      setErr(ex.message)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open={true} title={`New Subfolder in "${parent.name}"`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-4">
+        {err && <p className="text-sm text-ios-red bg-red-50 p-2 rounded-lg">{err}</p>}
+        <div className="flex items-center gap-2 text-xs text-ios-gray-2 bg-ios-gray-6 rounded-ios px-3 py-2">
+          <FolderPlus size={14} style={{ color: palette.color }} />
+          <span>Will be created inside <strong className="text-ios-label">{parent.name}</strong></span>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-ios-gray-2 mb-1">Subfolder Name *</label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q1 Projects" autoFocus />
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create Subfolder'}</Button>
         </div>
       </form>
     </Modal>

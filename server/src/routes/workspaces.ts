@@ -52,10 +52,10 @@ r.get('/:id', requireAuth, async (c) => {
   return c.json(data)
 })
 
-// POST /api/workspaces — create workspace
+// POST /api/workspaces — create workspace (or subfolder with parent_id)
 r.post('/', requireAuth, async (c) => {
   const user = c.get('user')
-  const body = await c.req.json() as { name: string; type?: string; icon?: string; description?: string }
+  const body = await c.req.json() as { name: string; type?: string; icon?: string; description?: string; parent_id?: string }
 
   const { data, error } = await (lf('workspaces') as any)
     .insert({
@@ -64,6 +64,7 @@ r.post('/', requireAuth, async (c) => {
       owner_id: user.id,
       icon: body.icon ?? null,
       description: body.description ?? null,
+      parent_id: body.parent_id ?? null,
     })
     .select()
     .single()
@@ -83,7 +84,7 @@ r.post('/', requireAuth, async (c) => {
 // PATCH /api/workspaces/:id
 r.patch('/:id', requireAuth, async (c) => {
   const body = await c.req.json() as Record<string, unknown>
-  const allowed = ['name', 'icon', 'description']
+  const allowed = ['name', 'icon', 'description', 'parent_id']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k]
 

@@ -15,18 +15,42 @@ const WORKSPACE_PALETTES = [
 
 export function workspacePalette(ws: Workspace | null) {
   if (!ws) return WORKSPACE_PALETTES[0]
+  // Subfolders share the colour of their parent so the workspace feels unified
+  const seed = ws.parent_id ?? ws.id
   let hash = 0
-  for (let i = 0; i < ws.id.length; i++) hash = (hash * 31 + ws.id.charCodeAt(i)) >>> 0
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
   return WORKSPACE_PALETTES[hash % WORKSPACE_PALETTES.length]
+}
+
+export interface WorkspaceNode extends Workspace {
+  children: WorkspaceNode[]
+}
+
+/** Build a forest (list of root nodes with nested children) from a flat list */
+export function buildWorkspaceTree(list: Workspace[]): WorkspaceNode[] {
+  const map = new Map<string, WorkspaceNode>()
+  list.forEach(ws => map.set(ws.id, { ...ws, children: [] }))
+  const roots: WorkspaceNode[] = []
+  list.forEach(ws => {
+    const node = map.get(ws.id)!
+    if (ws.parent_id && map.has(ws.parent_id)) {
+      map.get(ws.parent_id)!.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
 }
 
 interface WorkspaceContextValue {
   workspaceList: Workspace[]
+  workspaceTree: WorkspaceNode[]
   activeWorkspace: Workspace | null
   setActiveWorkspace: (w: Workspace) => void
   loading: boolean
   reload: () => Promise<void>
   createWorkspace: (name: string, type?: 'personal' | 'group') => Promise<Workspace>
+  createFolder: (name: string, parentId: string) => Promise<Workspace>
   deleteWorkspace: (id: string) => Promise<void>
 }
 
@@ -34,6 +58,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaceList, setWorkspaceList] = useState<Workspace[]>([])
+  const [workspaceTree, setWorkspaceTree] = useState<WorkspaceNode[]>([])
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(null)
   const [loading, setLoading] = useState(true)
   const initialised = useRef(false)
@@ -42,6 +67,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     try {
       const { workspaces: list } = await workspaces.list()
       setWorkspaceList(list)
+      setWorkspaceTree(buildWorkspaceTree(list))
 
       if (!initialised.current) {
         // First load — restore from localStorage or pick first
@@ -76,13 +102,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return ws
   }, [reload, setActiveWorkspace])
 
+  const createFolder = useCallback(async (name: string, parentId: string) => {
+    const parent = workspaceList.find(w => w.id === parentId)
+    const ws = await workspaces.create({ name, type: parent?.type ?? 'personal', parent_id: parentId })
+    await reload()
+    setActiveWorkspace(ws)
+    return ws
+  }, [workspaceList, reload, setActiveWorkspace])
+
   const deleteWorkspace = useCallback(async (id: string) => {
     await workspaces.delete(id)
     await reload()
   }, [reload])
 
   return (
-    <WorkspaceContext.Provider value={{ workspaceList, activeWorkspace, setActiveWorkspace, loading, reload, createWorkspace, deleteWorkspace }}>
+    <WorkspaceContext.Provider value={{ workspaceList, workspaceTree, activeWorkspace, setActiveWorkspace, loading, reload, createWorkspace, createFolder, deleteWorkspace }}>
       {children}
     </WorkspaceContext.Provider>
   )

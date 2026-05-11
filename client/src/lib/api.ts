@@ -32,7 +32,8 @@ const del = <T = { ok: boolean }>(p: string) => req<T>('DELETE', p)
 
 export interface Workspace {
   id: string; name: string; type: 'personal' | 'group'; owner_id: string
-  icon?: string; description?: string; created_at: string; updated_at: string
+  icon?: string; description?: string; parent_id?: string
+  created_at: string; updated_at: string
 }
 
 export interface Page {
@@ -139,7 +140,7 @@ export interface ConfigMatrixRow {
 export const workspaces = {
   list: () => get<{ workspaces: Workspace[] }>('/api/workspaces'),
   get: (id: string) => get<Workspace>(`/api/workspaces/${id}`),
-  create: (b: { name: string; type?: string; icon?: string; description?: string }) => post<Workspace>('/api/workspaces', b),
+  create: (b: { name: string; type?: string; icon?: string; description?: string; parent_id?: string }) => post<Workspace>('/api/workspaces', b),
   update: (id: string, b: Partial<Workspace>) => patch<Workspace>(`/api/workspaces/${id}`, b),
   delete: (id: string) => del(`/api/workspaces/${id}`),
   members: {

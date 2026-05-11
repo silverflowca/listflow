@@ -2,13 +2,15 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Home, FileText, Database, CheckSquare, Mic, Settings,
-  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle, LogOut
+  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle, LogOut,
+  ChevronDown, ChevronRight as ChevronRightSm, FolderOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
+import { useWorkspace, workspacePalette, type WorkspaceNode } from '@/contexts/WorkspaceContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 import { HelpModal } from '@/components/ui/HelpModal'
+import type { Workspace } from '@/lib/api'
 
 const NAV = [
   { to: '/', icon: Home, label: 'Home', exact: true },
@@ -23,10 +25,88 @@ const ADMIN_NAV = [
   { to: '/admin/config', icon: ShieldCheck, label: 'Permissions' },
 ]
 
+// ── Recursive workspace tree node ─────────────────────────────────────────────
+
+function WorkspaceTreeNode({
+  node,
+  depth,
+  activeWorkspace,
+  setActiveWorkspace,
+}: {
+  node: WorkspaceNode
+  depth: number
+  activeWorkspace: Workspace | null
+  setActiveWorkspace: (w: Workspace) => void
+}) {
+  const isActive = activeWorkspace?.id === node.id
+  const hasChildren = node.children.length > 0
+  const [open, setOpen] = useState(isActive || node.children.some(c => c.id === activeWorkspace?.id))
+  const wsPalette = workspacePalette(node)
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setActiveWorkspace(node)
+          if (hasChildren) setOpen(o => !o)
+        }}
+        className={cn(
+          'w-full flex items-center gap-1.5 py-1.5 rounded-ios text-sm transition-colors',
+          isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
+        )}
+        style={{
+          paddingLeft: `${8 + depth * 12}px`,
+          paddingRight: 8,
+          ...(isActive ? { backgroundColor: wsPalette.light, color: wsPalette.color } : {}),
+        }}
+      >
+        {/* Expand/collapse chevron */}
+        {hasChildren ? (
+          <span className="shrink-0 transition-transform" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+            <ChevronDown size={12} />
+          </span>
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+
+        {/* Folder icon */}
+        {hasChildren
+          ? <FolderOpen size={14} className="shrink-0" style={{ color: wsPalette.color }} />
+          : <Folder size={14} className="shrink-0" style={{ color: wsPalette.color }} />
+        }
+
+        <span className="truncate flex-1 text-left text-xs">{node.name}</span>
+
+        {isActive && <span className="text-[10px] shrink-0" style={{ color: wsPalette.color }}>✓</span>}
+        {!isActive && node.type === 'group' && (
+          <Users size={10} className="shrink-0 text-ios-gray-2" />
+        )}
+      </button>
+
+      {/* Children */}
+      {hasChildren && open && (
+        <div>
+          {node.children.map(child => (
+            <WorkspaceTreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              activeWorkspace={activeWorkspace}
+              setActiveWorkspace={setActiveWorkspace}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────────
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const { workspaceList, activeWorkspace, setActiveWorkspace } = useWorkspace()
+  const { workspaceTree, activeWorkspace, setActiveWorkspace } = useWorkspace()
   const { user, signOut, isDev } = useAuth()
   const navigate = useNavigate()
 
@@ -40,7 +120,7 @@ export function Sidebar() {
   return (
     <aside className={cn(
       'flex flex-col h-screen bg-white border-r border-ios-gray-5 transition-all duration-300',
-      collapsed ? 'w-14' : 'w-60',
+      collapsed ? 'w-14' : 'w-64',
     )}>
       {/* Header */}
       <div
@@ -68,43 +148,25 @@ export function Sidebar() {
 
       {/* Workspace picker */}
       {!collapsed && (
-        <div className="px-2 py-2 border-b border-ios-gray-5">
+        <div className="px-2 py-2 border-b border-ios-gray-5 overflow-y-auto max-h-60">
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-medium text-ios-gray-1 uppercase tracking-wide">Workspaces</span>
             <NavLink to="/workspace" className="text-ios-gray-2 hover:text-ios-blue transition-colors" title="Manage workspaces">
               <LayoutGrid size={13} />
             </NavLink>
           </div>
-          {workspaceList.map(ws => {
-            const isActive = activeWorkspace?.id === ws.id
-            const wsPalette = workspacePalette(ws)
-            return (
-              <button
-                key={ws.id}
-                onClick={() => setActiveWorkspace(ws)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm transition-colors',
-                  isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
-                )}
-                style={isActive ? {
-                  backgroundColor: wsPalette.light,
-                  color: wsPalette.color,
-                } : {}}
-              >
-                <div
-                  className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 transition-colors duration-300"
-                  style={{ backgroundColor: wsPalette.color }}
-                >
-                  {ws.icon ?? ws.name.charAt(0).toUpperCase()}
-                </div>
-                <span className="truncate flex-1 text-left">{ws.name}</span>
-                {isActive && <span className="text-[10px] shrink-0" style={{ color: wsPalette.color }}>✓</span>}
-                {ws.type === 'group' && !isActive && (
-                  <Users size={11} className="ml-auto text-ios-gray-2 shrink-0" />
-                )}
-              </button>
-            )
-          })}
+
+          {/* Tree */}
+          {workspaceTree.map(node => (
+            <WorkspaceTreeNode
+              key={node.id}
+              node={node}
+              depth={0}
+              activeWorkspace={activeWorkspace}
+              setActiveWorkspace={setActiveWorkspace}
+            />
+          ))}
+
           <NavLink
             to="/workspace"
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"

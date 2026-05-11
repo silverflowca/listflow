@@ -37,7 +37,7 @@ export function TasksView() {
       subscribe('task.created', (evt) => {
         const task = evt.payload.task as Task
         if (task.workspace_id === activeWorkspace?.id) {
-          setTaskList(prev => [task, ...prev])
+          setTaskList(prev => prev.some(t => t.id === task.id) ? prev : [task, ...prev])
         }
       }),
       subscribe('task.updated', (evt) => {
@@ -66,7 +66,9 @@ export function TasksView() {
       labels: [],
       position: 0,
     })
-    setTaskList(prev => [task, ...prev])
+    // Only append locally if the WS event won't arrive (no live connection)
+    // On Railway the WS subscriber handles the append — avoid doubling
+    setTaskList(prev => prev.some(t => t.id === task.id) ? prev : [task, ...prev])
     setCreateModal({ open: false, status: 'todo' })
     setForm({ title: '', description: '', priority: 'medium' })
     setCreating(false)

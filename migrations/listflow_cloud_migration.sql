@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS listflow.workspaces (
   owner_id    UUID NOT NULL,
   icon        TEXT,
   description TEXT,
+  parent_id   UUID REFERENCES listflow.workspaces(id) ON DELETE CASCADE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -252,6 +253,7 @@ CREATE TABLE IF NOT EXISTS listflow.config_matrix (
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 
 CREATE INDEX IF NOT EXISTS idx_lf_workspaces_owner      ON listflow.workspaces(owner_id);
+CREATE INDEX IF NOT EXISTS idx_lf_workspaces_parent     ON listflow.workspaces(parent_id) WHERE parent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_lf_members_workspace     ON listflow.workspace_members(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_lf_members_user          ON listflow.workspace_members(user_id);
 
