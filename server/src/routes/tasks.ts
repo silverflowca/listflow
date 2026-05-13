@@ -81,7 +81,7 @@ r.post('/', requireAuth, async (c) => {
 // PATCH /api/tasks/:id
 r.patch('/:id', requireAuth, async (c) => {
   const body = await c.req.json() as Record<string, unknown>
-  const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id']
+  const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id', 'effort_points']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k]
 

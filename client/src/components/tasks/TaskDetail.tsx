@@ -28,6 +28,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
   const { activeWorkspace } = useWorkspace()
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description ?? '')
+  const [effortPoints, setEffortPoints] = useState(task.effort_points ?? '')
   const [subtasks, setSubtasks] = useState<Subtask[]>(task.subtasks ?? [])
   const [comments, setComments] = useState<Comment[]>(task.comments ?? [])
   const [recordings, setRecordings] = useState<AudioRecording[]>([])
@@ -53,7 +54,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
 
   const save = async () => {
     setSaving(true)
-    const updated = await tasksApi.update(task.id, { title, description })
+    const updated = await tasksApi.update(task.id, { title, description, effort_points: effortPoints || undefined })
     onUpdate(updated)
     setSaving(false)
   }
@@ -224,6 +225,17 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
               >
                 {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-ios-gray-1 mb-1">Effort</p>
+              <input
+                type="text"
+                value={effortPoints}
+                onChange={e => setEffortPoints(e.target.value)}
+                onBlur={save}
+                placeholder="e.g. 3h, 2 days, 5 pts"
+                className="w-full text-sm rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 text-ios-label outline-none ws-focus"
+              />
             </div>
           </div>
 

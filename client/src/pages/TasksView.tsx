@@ -95,6 +95,16 @@ function TaskRow({ task, workspaceList, onClick }: TaskRowProps) {
         </span>
       )}
 
+      {/* Effort */}
+      {task.effort_points && (
+        <span
+          className="hidden sm:block text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+          style={{ backgroundColor: 'var(--ws-color-light)', color: 'var(--ws-color)' }}
+        >
+          {task.effort_points}
+        </span>
+      )}
+
       {/* Status */}
       <StatusBadge status={task.status} />
 

@@ -35,6 +35,12 @@ export function TaskCard({ task, onClick, dragging }: TaskCardProps) {
       <div className="flex items-center gap-3 text-xs text-ios-gray-1">
         <PriorityBadge priority={task.priority} />
 
+        {task.effort_points && (
+          <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--ws-color, #007AFF)' }}>
+            {task.effort_points}
+          </span>
+        )}
+
         {task.due_date && (
           <span className="flex items-center gap-1">
             <Calendar size={11} />

@@ -53,6 +53,7 @@ export interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   assignee_ids: string[]; parent_task_id?: string; due_date?: string; labels: string[]
+  effort_points?: string
   created_by: string; position: number; created_at: string; updated_at: string
   subtasks?: Subtask[]; comments?: Comment[]
 }

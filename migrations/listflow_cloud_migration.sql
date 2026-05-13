@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS listflow.tasks (
   parent_task_id UUID REFERENCES listflow.tasks(id) ON DELETE SET NULL,
   due_date       DATE,
   labels         TEXT[] NOT NULL DEFAULT '{}',
+  effort_points  TEXT,
   created_by     UUID NOT NULL,
   position       INTEGER NOT NULL DEFAULT 0,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
