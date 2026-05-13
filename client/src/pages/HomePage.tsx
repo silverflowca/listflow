@@ -37,7 +37,7 @@ export function HomePage() {
   if (!activeWorkspace) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-        <div className="w-16 h-16 bg-ios-blue rounded-ios-xl flex items-center justify-center">
+        <div className="w-16 h-16 ws-btn-primary rounded-ios-xl flex items-center justify-center">
           <CheckSquare size={32} className="text-white" />
         </div>
         <h2 className="text-xl font-semibold text-ios-label">Welcome to ListFlow</h2>
@@ -66,8 +66,8 @@ export function HomePage() {
             {/* Quick actions */}
             <div className="grid grid-cols-3 gap-3">
               <button onClick={createPage} className="flex flex-col items-center gap-2 p-4 bg-white rounded-ios-lg shadow-ios hover:shadow-ios-md transition-shadow">
-                <div className="w-10 h-10 bg-ios-blue/10 rounded-ios flex items-center justify-center">
-                  <FileText size={20} className="text-ios-blue" />
+                <div className="w-10 h-10 ws-bg rounded-ios flex items-center justify-center">
+                  <FileText size={20} className="ws-text" />
                 </div>
                 <span className="text-xs font-medium text-ios-label">New Page</span>
               </button>
@@ -90,7 +90,7 @@ export function HomePage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-ios-label">Recent Tasks</h2>
-                  <Link to="/tasks" className="text-xs text-ios-blue flex items-center gap-1">
+                  <Link to="/tasks" className="text-xs ws-text flex items-center gap-1">
                     See all <ArrowRight size={12} />
                   </Link>
                 </div>
@@ -118,7 +118,7 @@ export function HomePage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-ios-label">Pages</h2>
-                  <Link to="/pages" className="text-xs text-ios-blue flex items-center gap-1">
+                  <Link to="/pages" className="text-xs ws-text flex items-center gap-1">
                     See all <ArrowRight size={12} />
                   </Link>
                 </div>

@@ -41,7 +41,7 @@ function AudioPlayer({ src }: { src: string }) {
       />
       <button
         onClick={toggle}
-        className="w-8 h-8 rounded-full bg-ios-blue text-white flex items-center justify-center shrink-0 hover:bg-ios-blue/90 transition-colors"
+        className="w-8 h-8 rounded-full ws-btn-primary flex items-center justify-center shrink-0 transition-colors"
       >
         {playing ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" />}
       </button>
@@ -56,7 +56,7 @@ function AudioPlayer({ src }: { src: string }) {
           if (audioRef.current) audioRef.current.currentTime = t
           setProgress(t)
         }}
-        className="flex-1 accent-ios-blue h-1.5 cursor-pointer"
+        className="flex-1 ws-accent h-1.5 cursor-pointer"
       />
       <span className="text-xs text-ios-gray-1 font-mono shrink-0">
         {fmt(progress)} / {fmt(duration)}
@@ -100,7 +100,7 @@ function RecordingCard({ rec, onDelete }: { rec: AudioRecording; onDelete: () =>
           {(transcript || audioSrc) && (
             <button
               onClick={() => setExpanded(e => !e)}
-              className="p-1.5 text-ios-gray-1 hover:text-ios-blue hover:bg-blue-50 rounded-ios transition-colors"
+              className="p-1.5 text-ios-gray-1 hover:ws-text hover:ws-bg rounded-ios transition-colors"
             >
               {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -120,8 +120,8 @@ function RecordingCard({ rec, onDelete }: { rec: AudioRecording; onDelete: () =>
           {audioSrc && <AudioPlayer src={audioSrc} />}
 
           {transcript && (
-            <div className="bg-blue-50 rounded-ios p-3">
-              <p className="text-xs font-semibold text-ios-blue mb-1.5">Transcript</p>
+            <div className="ws-bg rounded-ios p-3">
+              <p className="text-xs font-semibold ws-text mb-1.5">Transcript</p>
               <p className="text-sm text-ios-label leading-relaxed whitespace-pre-wrap">{transcript.raw_text}</p>
               {transcript.confidence_score > 0 && (
                 <p className="text-xs text-ios-gray-1 mt-2">
@@ -185,8 +185,8 @@ export function AudioView() {
         {/* Latest transcript + agent panel */}
         {activeTranscript && (
           <div className="space-y-3">
-            <div className="bg-blue-50 rounded-ios-lg p-4">
-              <p className="text-xs font-semibold text-ios-blue mb-2">Latest Transcript</p>
+            <div className="ws-bg rounded-ios-lg p-4">
+              <p className="text-xs font-semibold ws-text mb-2">Latest Transcript</p>
               <p className="text-sm text-ios-label leading-relaxed whitespace-pre-wrap">{activeTranscript.text}</p>
             </div>
             {activeRunId && <AgentPanel runId={activeRunId} />}

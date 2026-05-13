@@ -252,7 +252,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
                     type="checkbox"
                     checked={sub.completed}
                     onChange={() => toggleSubtask(sub)}
-                    className="rounded accent-ios-blue"
+                    className="rounded ws-accent"
                   />
                   <span className={cn('text-sm flex-1', sub.completed && 'line-through text-ios-gray-2')}>
                     {sub.title}
@@ -274,7 +274,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
                 className="flex-1 text-sm rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 outline-none"
                 placeholder="Add subtask…"
               />
-              <button onClick={addSubtask} className="p-2 bg-ios-blue text-white rounded-ios hover:bg-blue-600 transition-colors">
+              <button onClick={addSubtask} className="p-2 ws-btn-primary rounded-ios transition-colors">
                 <Plus size={14} />
               </button>
             </div>
@@ -312,7 +312,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
             </div>
 
             {uploadingAudio && (
-              <p className="text-xs text-ios-blue mb-2 animate-pulse">Uploading & transcribing…</p>
+              <p className="text-xs ws-text mb-2 animate-pulse">Uploading & transcribing…</p>
             )}
             {recording && (
               <p className="text-xs text-ios-red mb-2 animate-pulse flex items-center gap-1">
@@ -341,7 +341,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
                         {transcript && (
                           <button
                             onClick={() => toggleTranscript(rec.id)}
-                            className="flex items-center gap-0.5 text-xs text-ios-blue hover:underline shrink-0"
+                            className="flex items-center gap-0.5 text-xs ws-text hover:underline shrink-0"
                           >
                             {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             Transcript
@@ -402,7 +402,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
               <button
                 onClick={addComment}
                 disabled={addingComment}
-                className="p-2 bg-ios-blue text-white rounded-ios hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                className="p-2 ws-btn-primary rounded-ios disabled:opacity-50 transition-colors"
               >
                 <Plus size={14} />
               </button>
@@ -419,7 +419,7 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
 function StatusBadge({ status }: { status: Task['status'] }) {
   const map: Record<string, string> = {
     todo: 'bg-ios-gray-5 text-ios-gray-2',
-    in_progress: 'bg-blue-100 text-ios-blue',
+    in_progress: 'ws-bg ws-text',
     review: 'bg-yellow-100 text-yellow-700',
     done: 'bg-green-100 text-green-700',
     cancelled: 'bg-red-100 text-ios-red',

@@ -11,9 +11,9 @@ export function Button({ variant = 'primary', size = 'md', loading, className, c
   const base = 'inline-flex items-center justify-center font-medium transition-all duration-150 active:scale-95 rounded-ios select-none'
 
   const variants = {
-    primary: 'bg-ios-blue text-white hover:bg-blue-600 shadow-ios',
+    primary: 'ws-btn-primary',
     secondary: 'bg-ios-gray-5 text-ios-label hover:bg-ios-gray-4',
-    ghost: 'text-ios-blue hover:bg-ios-gray-6',
+    ghost: 'ws-btn-ghost',
     destructive: 'bg-ios-red text-white hover:bg-red-600',
     outline: 'border border-ios-gray-4 text-ios-label hover:bg-ios-gray-6',
   }

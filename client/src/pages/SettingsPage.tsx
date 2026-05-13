@@ -23,7 +23,7 @@ function ModelSelect({
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full appearance-none text-sm rounded-ios border border-ios-gray-4 px-3 py-1.5 pr-8 bg-ios-gray-6 text-ios-label outline-none focus:border-ios-blue focus:ring-2 focus:ring-ios-blue/20"
+        className="w-full appearance-none text-sm rounded-ios border border-ios-gray-4 px-3 py-1.5 pr-8 bg-ios-gray-6 text-ios-label outline-none ws-focus"
       >
         <option value="">{placeholder}</option>
         {groups.map(g => (
@@ -78,7 +78,7 @@ function SettingRow({
           <div className="flex items-center gap-2 mt-0.5">
             <span className={`text-xs px-1.5 py-0.5 rounded-full ${
               setting.source === 'override' ? 'bg-ios-green/10 text-ios-green'
-              : setting.source === 'env' ? 'bg-blue-50 text-ios-blue'
+              : setting.source === 'env' ? 'ws-bg ws-text'
               : 'bg-ios-gray-5 text-ios-gray-1'
             }`}>
               {setting.source === 'override' ? '✓ Override active'
@@ -102,7 +102,7 @@ function SettingRow({
           )}
           <button
             onClick={() => setEditing(e => !e)}
-            className="text-xs text-ios-blue hover:bg-ios-blue/10 px-2 py-1 rounded-ios transition-colors"
+            className="text-xs ws-text hover:ws-bg px-2 py-1 rounded-ios transition-colors"
           >
             {editing ? 'Cancel' : 'Set'}
           </button>
@@ -353,7 +353,7 @@ export function SettingsPage() {
                   href={status.fileflow.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-ios-blue hover:underline"
+                  className="flex items-center gap-1 text-xs ws-text hover:underline"
                 >
                   Open FileFlow <ExternalLink size={11} />
                 </a>

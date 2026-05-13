@@ -91,7 +91,7 @@ export function AudioRecorder({ onTranscriptReady, pageId, taskId }: AudioRecord
             state === 'recording' ? 'bg-ios-red text-white scale-110'
             : state === 'uploading' ? 'bg-ios-gray-5 text-ios-gray-2'
             : state === 'done' ? 'bg-ios-green text-white'
-            : 'bg-ios-blue text-white hover:scale-105',
+            : 'ws-btn-primary hover:scale-105',
           )}
         >
           {state === 'recording' ? <Square size={28} fill="white" />
@@ -120,7 +120,7 @@ export function AudioRecorder({ onTranscriptReady, pageId, taskId }: AudioRecord
 
       {/* Record again */}
       {(state === 'done' || state === 'error') && (
-        <button onClick={reset} className="text-xs text-ios-blue hover:underline">
+        <button onClick={reset} className="text-xs ws-text hover:underline">
           Record again
         </button>
       )}

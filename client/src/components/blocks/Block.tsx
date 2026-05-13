@@ -71,7 +71,7 @@ export function BlockItem({ block, index, onUpdate, onEnter, onDelete, onSlashMe
           type="checkbox"
           checked={!!checked}
           onChange={() => onUpdate({ ...block.content, checked: !checked })}
-          className="mt-1.5 shrink-0 rounded accent-ios-blue"
+          className="mt-1.5 shrink-0 rounded ws-accent"
         />
       )}
       <div

@@ -137,7 +137,7 @@ function GroupCard({ group, allUsers, expanded, onToggle, onDelete, onAddMember,
         <div className="border-t border-ios-gray-6 px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-ios-gray-2">Members</span>
-            <button onClick={onAddMember} className="text-xs text-ios-blue hover:underline">+ Add member</button>
+            <button onClick={onAddMember} className="text-xs ws-text hover:underline">+ Add member</button>
           </div>
           {(group.members ?? []).length === 0 ? (
             <p className="text-xs text-ios-gray-3 py-1">No members yet</p>

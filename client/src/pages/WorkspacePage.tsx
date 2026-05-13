@@ -374,7 +374,7 @@ function CreateWorkspaceModal({ onClose, onCreate }: {
                 className={
                   `flex-1 py-2 text-sm rounded-xl border-2 capitalize transition-colors ` +
                   (type === t
-                    ? 'border-ios-blue bg-blue-50 text-ios-blue font-medium'
+                    ? 'ws-border ws-bg ws-text border-2 font-medium'
                     : 'border-ios-gray-5 text-ios-gray-2 hover:border-ios-gray-3')
                 }
               >

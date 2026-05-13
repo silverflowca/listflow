@@ -150,8 +150,8 @@ export function Sidebar() {
       {!collapsed && (
         <div className="px-2 py-2 border-b border-ios-gray-5 overflow-y-auto max-h-60">
           <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-xs font-medium text-ios-gray-1 uppercase tracking-wide">Workspaces</span>
-            <NavLink to="/workspace" className="text-ios-gray-2 hover:text-ios-blue transition-colors" title="Manage workspaces">
+            <span className="text-xs font-medium text-ios-gray-1 uppercase tracking-wide">Workspace Config</span>
+            <NavLink to="/workspace" className="text-ios-gray-2 hover:ws-text transition-colors" title="Manage workspaces">
               <LayoutGrid size={13} />
             </NavLink>
           </div>
@@ -172,7 +172,7 @@ export function Sidebar() {
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-ios text-sm text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
           >
             <Plus size={14} />
-            <span>Add Workspace</span>
+            <span>Add Workspace Config</span>
           </NavLink>
         </div>
       )}
@@ -203,7 +203,7 @@ export function Sidebar() {
           <div className="mt-3">
             <div className="text-xs font-medium text-ios-gray-1 px-2 py-1 uppercase tracking-wide flex items-center justify-between">
               <span>Pages</span>
-              <NavLink to="/pages/new" className="hover:text-ios-blue transition-colors">
+              <NavLink to="/pages/new" className="hover:ws-text transition-colors">
                 <Plus size={12} />
               </NavLink>
             </div>

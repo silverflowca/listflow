@@ -65,7 +65,7 @@ export function AgentPanel({ runId, onTasksCreated }: AgentPanelProps) {
       >
         <Bot size={16} className="text-ios-purple shrink-0" />
         <span className="text-sm font-medium text-ios-label flex-1">AI Agent</span>
-        {status === 'running' && <Loader2 size={14} className="text-ios-blue animate-spin" />}
+        {status === 'running' && <Loader2 size={14} className="ws-spinner animate-spin" />}
         {status === 'done' && <CheckCircle size={14} className="text-ios-green" />}
         {status === 'failed' && <AlertCircle size={14} className="text-ios-red" />}
         {expanded ? <ChevronUp size={14} className="text-ios-gray-1" /> : <ChevronDown size={14} className="text-ios-gray-1" />}
@@ -77,7 +77,7 @@ export function AgentPanel({ runId, onTasksCreated }: AgentPanelProps) {
           {messages.length > 0 && (
             <div className="px-4 py-2 max-h-40 overflow-y-auto space-y-1">
               {messages.map((msg, i) => (
-                <div key={i} className={`text-xs ${msg.type === 'error' ? 'text-ios-red' : msg.type === 'tool' ? 'text-ios-blue font-mono' : 'text-ios-gray-1'}`}>
+                <div key={i} className={`text-xs ${msg.type === 'error' ? 'text-ios-red' : msg.type === 'tool' ? 'ws-text font-mono' : 'text-ios-gray-1'}`}>
                   {msg.text}
                 </div>
               ))}

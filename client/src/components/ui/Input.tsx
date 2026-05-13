@@ -16,8 +16,7 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
         id={inputId}
         className={cn(
           'w-full px-3 py-2 bg-ios-gray-6 border border-ios-gray-4 rounded-ios text-ios-label text-sm',
-          'placeholder:text-ios-gray-2 focus:outline-none focus:ring-2 focus:ring-ios-blue focus:border-transparent',
-          'transition-all duration-150',
+          'placeholder:text-ios-gray-2 ws-focus transition-all duration-150',
           error && 'border-ios-red focus:ring-ios-red',
           className,
         )}
@@ -42,8 +41,7 @@ export function Textarea({ label, error, className, id, ...props }: TextareaProp
         id={inputId}
         className={cn(
           'w-full px-3 py-2 bg-ios-gray-6 border border-ios-gray-4 rounded-ios text-ios-label text-sm',
-          'placeholder:text-ios-gray-2 focus:outline-none focus:ring-2 focus:ring-ios-blue focus:border-transparent',
-          'transition-all duration-150 resize-none',
+          'placeholder:text-ios-gray-2 ws-focus transition-all duration-150 resize-none',
           error && 'border-ios-red focus:ring-ios-red',
           className,
         )}

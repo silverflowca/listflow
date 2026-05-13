@@ -14,7 +14,7 @@ export function TranscriptView({ transcript }: TranscriptViewProps) {
   return (
     <div className="bg-ios-gray-6 rounded-ios-lg p-4">
       <div className="flex items-center gap-2 mb-3">
-        <FileText size={16} className="text-ios-blue" />
+        <FileText size={16} className="ws-text" />
         <span className="text-sm font-medium text-ios-label">Transcript</span>
         <span className="ml-auto text-xs text-ios-gray-1">
           {(transcript.confidence_score * 100).toFixed(0)}% confidence

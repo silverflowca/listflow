@@ -35,14 +35,14 @@ export function initials(name: string): string {
 
 export const PRIORITY_COLORS = {
   low: 'text-ios-gray-1',
-  medium: 'text-ios-blue',
+  medium: 'ws-text',
   high: 'text-ios-orange',
   urgent: 'text-ios-red',
 } as const
 
 export const STATUS_COLORS = {
   todo: 'bg-ios-gray-5 text-ios-gray-1',
-  in_progress: 'bg-blue-100 text-ios-blue',
+  in_progress: 'ws-bg ws-text',
   review: 'bg-purple-100 text-ios-purple',
   done: 'bg-green-100 text-ios-green',
   cancelled: 'bg-ios-gray-5 text-ios-gray-2 line-through',

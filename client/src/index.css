@@ -29,10 +29,48 @@
     @apply bg-ios-gray-3;
   }
 
-  /* Selection */
+  /* Selection follows workspace colour */
   ::selection {
-    @apply bg-ios-blue/20 text-ios-label;
+    background-color: var(--ws-color-light, rgba(0,122,255,0.15));
+    color: #1C1C1E;
   }
+}
+
+/* ── Workspace colour utilities ──────────────────────────────────────────────
+   References --ws-color / --ws-color-light set on the Layout root by
+   Layout.tsx. Every tinted element updates when the active workspace changes.
+   ──────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Primary filled button */
+  .ws-btn-primary {
+    background-color: var(--ws-color, #007AFF);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .ws-btn-primary:hover:not(:disabled) { filter: brightness(0.88); }
+  .ws-btn-primary:active:not(:disabled) { filter: brightness(0.80); }
+
+  /* Ghost / text button */
+  .ws-btn-ghost { color: var(--ws-color, #007AFF); }
+  .ws-btn-ghost:hover:not(:disabled) { background-color: var(--ws-color-light, rgba(0,122,255,0.12)); }
+
+  /* Generic helpers */
+  .ws-text   { color: var(--ws-color, #007AFF); }
+  .ws-bg     { background-color: var(--ws-color-light, rgba(0,122,255,0.12)); }
+  .ws-border { border-color: var(--ws-color, #007AFF); }
+
+  /* Focus ring — replaces focus:ring-ios-blue */
+  .ws-focus:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ws-color, #007AFF);
+    border-color: transparent;
+  }
+
+  /* Spinner / loader */
+  .ws-spinner { color: var(--ws-color, #007AFF); }
+
+  /* Checkbox / range accent */
+  .ws-accent { accent-color: var(--ws-color, #007AFF); }
 }
 
 @layer utilities {

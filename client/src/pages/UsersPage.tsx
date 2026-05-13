@@ -90,7 +90,7 @@ export function UsersPage() {
                       <select
                         value={u.role}
                         onChange={e => handleRoleChange(u, e.target.value as AppRole)}
-                        className="text-xs border border-ios-gray-5 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-ios-blue/30"
+                        className="text-xs border border-ios-gray-5 rounded-lg px-2 py-1 bg-white ws-focus"
                       >
                         {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
@@ -163,7 +163,7 @@ function AddUserModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =
           <select
             value={form.role}
             onChange={e => setForm(f => ({ ...f, role: e.target.value as AppRole }))}
-            className="w-full text-sm border border-ios-gray-5 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-ios-blue/30"
+            className="w-full text-sm border border-ios-gray-5 rounded-xl px-3 py-2 bg-white ws-focus"
           >
             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -206,7 +206,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: AppUser; onClose: () 
           <select
             value={form.role}
             onChange={e => setForm(f => ({ ...f, role: e.target.value as AppRole }))}
-            className="w-full text-sm border border-ios-gray-5 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-ios-blue/30"
+            className="w-full text-sm border border-ios-gray-5 rounded-xl px-3 py-2 bg-white ws-focus"
           >
             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>

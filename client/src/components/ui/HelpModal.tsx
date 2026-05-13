@@ -15,7 +15,7 @@ const SECTIONS: Section[] = [
     id: 'tasks',
     icon: <CheckSquare size={16} />,
     title: 'Tasks',
-    color: 'text-ios-blue',
+    color: 'ws-text',
     items: [
       { label: 'Create a task', desc: 'Go to Tasks → click "+ New Task" in the top-right corner. Fill in title, status, and priority.' },
       { label: 'Change status / priority', desc: 'Open a task by clicking it. Use the Status and Priority dropdowns at the top of the detail panel.' },
@@ -127,7 +127,7 @@ const SECTIONS: Section[] = [
     id: 'shortcuts',
     icon: <Keyboard size={16} />,
     title: 'Keyboard Shortcuts',
-    color: 'text-ios-blue',
+    color: 'ws-text',
     items: [
       { label: '/ in a page', desc: 'Opens the block type picker at the current cursor position.' },
       { label: 'Enter on empty block', desc: 'Creates a new block below the current one.' },
@@ -216,7 +216,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-ios-gray-5 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-ios-blue rounded-ios flex items-center justify-center">
+            <div className="w-7 h-7 ws-btn-primary rounded-ios flex items-center justify-center">
               <CheckSquare size={14} className="text-white" />
             </div>
             <div>
@@ -234,9 +234,9 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
         {/* Expand / Collapse all */}
         <div className="flex items-center gap-3 px-5 py-2 border-b border-ios-gray-5 shrink-0">
-          <button onClick={expandAll} className="text-xs text-ios-blue hover:underline">Expand all</button>
+          <button onClick={expandAll} className="text-xs ws-text hover:underline">Expand all</button>
           <span className="text-ios-gray-4 text-xs">·</span>
-          <button onClick={collapseAll} className="text-xs text-ios-blue hover:underline">Collapse all</button>
+          <button onClick={collapseAll} className="text-xs ws-text hover:underline">Collapse all</button>
         </div>
 
         {/* Scrollable content */}

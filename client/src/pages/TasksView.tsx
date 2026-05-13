@@ -88,10 +88,10 @@ export function TasksView() {
         title="Tasks"
         actions={
           <div className="flex items-center gap-2">
-            <button onClick={() => setView('board')} className={`p-2 rounded-ios ${view === 'board' ? 'bg-ios-blue text-white' : 'text-ios-gray-1 hover:bg-ios-gray-5'}`}>
+            <button onClick={() => setView('board')} className={`p-2 rounded-ios ${view === 'board' ? 'ws-btn-primary' : 'text-ios-gray-1 hover:bg-ios-gray-5'}`}>
               <LayoutGrid size={16} />
             </button>
-            <button onClick={() => setView('list')} className={`p-2 rounded-ios ${view === 'list' ? 'bg-ios-blue text-white' : 'text-ios-gray-1 hover:bg-ios-gray-5'}`}>
+            <button onClick={() => setView('list')} className={`p-2 rounded-ios ${view === 'list' ? 'ws-btn-primary' : 'text-ios-gray-1 hover:bg-ios-gray-5'}`}>
               <List size={16} />
             </button>
             <Button size="sm" onClick={() => setCreateModal({ open: true, status: 'todo' })}>
@@ -120,7 +120,7 @@ export function TasksView() {
                 onClick={() => setSelectedTask(task)}
                 className="flex items-center gap-3 bg-white rounded-ios px-4 py-3 shadow-ios cursor-pointer hover:shadow-ios-md transition-shadow"
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-ios-red' : task.priority === 'high' ? 'bg-ios-orange' : task.priority === 'medium' ? 'bg-ios-blue' : 'bg-ios-gray-3'}`} />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${task.priority === 'urgent' ? 'bg-ios-red' : task.priority === 'high' ? 'bg-ios-orange' : task.priority === 'medium' ? 'ws-text' : 'bg-ios-gray-3'}`} style={task.priority === 'medium' ? { backgroundColor: 'var(--ws-color)' } : {}} />
                 <span className="text-sm text-ios-label flex-1">{task.title}</span>
                 <span className="text-xs text-ios-gray-1 capitalize">{task.status.replace('_', ' ')}</span>
               </div>

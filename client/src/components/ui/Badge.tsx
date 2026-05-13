@@ -9,7 +9,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 export function Badge({ variant = 'default', className, children, ...props }: BadgeProps) {
   const variants = {
     default: 'bg-ios-gray-5 text-ios-gray-1',
-    blue: 'bg-blue-100 text-ios-blue',
+    blue: 'ws-bg ws-text',
     green: 'bg-green-100 text-ios-green',
     orange: 'bg-orange-100 text-ios-orange',
     red: 'bg-red-100 text-ios-red',
@@ -34,7 +34,7 @@ export function StatusBadge({ status }: { status: Task['status'] }) {
 export function PriorityBadge({ priority }: { priority: Task['priority'] }) {
   const colors = {
     low: 'text-ios-gray-1',
-    medium: 'text-ios-blue',
+    medium: 'ws-text',
     high: 'text-ios-orange',
     urgent: 'text-ios-red font-semibold',
   }
