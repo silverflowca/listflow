@@ -200,7 +200,8 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
             value={title}
             onChange={e => setTitle(e.target.value)}
             onBlur={save}
-            className="w-full text-xl font-semibold text-ios-label outline-none border-none bg-transparent"
+            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+            className="w-full text-xl font-semibold text-ios-label outline-none bg-transparent rounded-lg px-2 py-1 -mx-2 hover:bg-ios-gray-6 focus:bg-ios-gray-6 transition-colors"
             placeholder="Task title"
           />
 
