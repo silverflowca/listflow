@@ -10,17 +10,17 @@ import { pages as pagesApi, type Page } from '@/lib/api'
 import { formatRelative } from '@/lib/utils'
 
 export function PagesListPage() {
-  const { activeWorkspace } = useWorkspace()
+  const { activeWorkspace, activeDescendantIds } = useWorkspace()
   const [pageList, setPageList] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!activeWorkspace) return
-    pagesApi.list(activeWorkspace.id).then(({ pages }) => {
+    pagesApi.list(activeWorkspace.id, activeDescendantIds).then(({ pages }) => {
       setPageList(pages)
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [activeWorkspace?.id])
+  }, [activeWorkspace?.id, activeDescendantIds.join(',')])
 
   const createPage = async () => {
     if (!activeWorkspace) return

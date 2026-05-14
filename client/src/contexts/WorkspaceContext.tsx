@@ -42,6 +42,18 @@ export function buildWorkspaceTree(list: Workspace[]): WorkspaceNode[] {
   return roots
 }
 
+/** Collect all descendant IDs (not including the root itself) */
+export function getDescendantIds(wsId: string, list: Workspace[]): string[] {
+  const result: string[] = []
+  const queue = [wsId]
+  while (queue.length) {
+    const current = queue.shift()!
+    const children = list.filter(w => w.parent_id === current)
+    children.forEach(c => { result.push(c.id); queue.push(c.id) })
+  }
+  return result
+}
+
 interface WorkspaceContextValue {
   workspaceList: Workspace[]
   workspaceTree: WorkspaceNode[]
@@ -52,6 +64,8 @@ interface WorkspaceContextValue {
   createWorkspace: (name: string, type?: 'personal' | 'group') => Promise<Workspace>
   createFolder: (name: string, parentId: string) => Promise<Workspace>
   deleteWorkspace: (id: string) => Promise<void>
+  /** IDs of all subfolders under the active workspace (empty if none) */
+  activeDescendantIds: string[]
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -60,6 +74,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaceList, setWorkspaceList] = useState<Workspace[]>([])
   const [workspaceTree, setWorkspaceTree] = useState<WorkspaceNode[]>([])
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(null)
+  const [activeDescendantIds, setActiveDescendantIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const initialised = useRef(false)
 
@@ -90,6 +105,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { reload() }, [reload])
 
+  // Recompute descendant IDs whenever active workspace or list changes
+  useEffect(() => {
+    if (!activeWorkspace) { setActiveDescendantIds([]); return }
+    setActiveDescendantIds(getDescendantIds(activeWorkspace.id, workspaceList))
+  }, [activeWorkspace, workspaceList])
+
   const setActiveWorkspace = useCallback((w: Workspace) => {
     setActiveWorkspaceState(w)
     localStorage.setItem('listflow_workspace', w.id)
@@ -116,7 +137,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [reload])
 
   return (
-    <WorkspaceContext.Provider value={{ workspaceList, workspaceTree, activeWorkspace, setActiveWorkspace, loading, reload, createWorkspace, createFolder, deleteWorkspace }}>
+    <WorkspaceContext.Provider value={{ workspaceList, workspaceTree, activeWorkspace, setActiveWorkspace, loading, reload, createWorkspace, createFolder, deleteWorkspace, activeDescendantIds }}>
       {children}
     </WorkspaceContext.Provider>
   )

@@ -5,16 +5,18 @@ import { emitTaskCreated, emitTaskUpdated } from '../lib/ws.js'
 
 const r = new Hono()
 
-// GET /api/tasks?workspaceId=&status=&priority=&limit=
+// GET /api/tasks?workspaceId=&workspaceIds=id1,id2&status=&priority=&limit=
 r.get('/', requireAuth, async (c) => {
-  const { workspaceId, status, priority, databaseId } = c.req.query()
+  const { workspaceId, workspaceIds, status, priority, databaseId } = c.req.query()
   const limit = parseInt(c.req.query('limit') ?? '200')
 
-  if (!workspaceId) return c.json({ error: 'workspaceId required' }, 400)
+  if (!workspaceId && !workspaceIds) return c.json({ error: 'workspaceId required' }, 400)
+
+  const ids = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId!]
 
   let q = (lf('tasks') as any)
     .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
-    .eq('workspace_id', workspaceId)
+    .in('workspace_id', ids)
     .order('position', { ascending: true })
     .limit(limit)
 

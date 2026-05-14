@@ -11,7 +11,7 @@ import { pages, tasks, type Page, type Task } from '@/lib/api'
 import { formatRelative } from '@/lib/utils'
 
 export function HomePage() {
-  const { activeWorkspace } = useWorkspace()
+  const { activeWorkspace, activeDescendantIds } = useWorkspace()
   const [recentPages, setRecentPages] = useState<Page[]>([])
   const [recentTasks, setRecentTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,14 +19,14 @@ export function HomePage() {
   useEffect(() => {
     if (!activeWorkspace) return
     Promise.all([
-      pages.list(activeWorkspace.id),
-      tasks.list({ workspaceId: activeWorkspace.id, limit: 6 }),
+      pages.list(activeWorkspace.id, activeDescendantIds),
+      tasks.list({ workspaceId: activeWorkspace.id, extraIds: activeDescendantIds, limit: 6 }),
     ]).then(([{ pages: p }, { tasks: t }]) => {
       setRecentPages(p.slice(0, 6))
       setRecentTasks(t.slice(0, 6))
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [activeWorkspace?.id])
+  }, [activeWorkspace?.id, activeDescendantIds.join(',')])
 
   const createPage = async () => {
     if (!activeWorkspace) return

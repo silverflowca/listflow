@@ -139,7 +139,7 @@ function RecordingCard({ rec, onDelete }: { rec: AudioRecording; onDelete: () =>
 
 // ── Main page ─────────────────────────────────────────────────
 export function AudioView() {
-  const { activeWorkspace } = useWorkspace()
+  const { activeWorkspace, activeDescendantIds } = useWorkspace()
   const [recordings, setRecordings] = useState<AudioRecording[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTranscript, setActiveTranscript] = useState<{ id: string; text: string } | null>(null)
@@ -148,13 +148,13 @@ export function AudioView() {
   const loadRecordings = async () => {
     if (!activeWorkspace) return
     try {
-      const { recordings } = await audioApi.list(activeWorkspace.id)
+      const { recordings } = await audioApi.list(activeWorkspace.id, activeDescendantIds)
       setRecordings(recordings)
     } catch {}
     setLoading(false)
   }
 
-  useEffect(() => { loadRecordings() }, [activeWorkspace?.id])
+  useEffect(() => { loadRecordings() }, [activeWorkspace?.id, activeDescendantIds.join(',')])
 
   const handleTranscriptReady = (transcriptId: string, rawText: string, runId: string | null) => {
     setActiveTranscript({ id: transcriptId, text: rawText })

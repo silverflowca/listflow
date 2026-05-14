@@ -152,7 +152,11 @@ export const workspaces = {
 }
 
 export const pages = {
-  list: (workspaceId: string) => get<{ pages: Page[] }>(`/api/pages?workspaceId=${workspaceId}`),
+  list: (workspaceId: string, extraIds?: string[]) => {
+    const ids = extraIds?.length ? [...new Set([workspaceId, ...extraIds])] : null
+    const qs = ids ? `workspaceIds=${ids.join(',')}` : `workspaceId=${workspaceId}`
+    return get<{ pages: Page[] }>(`/api/pages?${qs}`)
+  },
   get: (id: string) => get<Page>(`/api/pages/${id}`),
   create: (b: { workspaceId: string; title?: string; parentId?: string; icon?: string; isDatabase?: boolean }) => post<Page>('/api/pages', b),
   update: (id: string, b: Partial<Page>) => patch<Page>(`/api/pages/${id}`, b),
@@ -168,9 +172,15 @@ export const blocks = {
 }
 
 export const tasks = {
-  list: (params: { workspaceId: string; status?: string; priority?: string; databaseId?: string; limit?: number }) => {
+  list: (params: { workspaceId: string; extraIds?: string[]; status?: string; priority?: string; databaseId?: string; limit?: number }) => {
+    const { extraIds, workspaceId, ...rest } = params
     const qs = new URLSearchParams()
-    Object.entries(params).forEach(([k, v]) => v !== undefined && qs.set(k, String(v)))
+    if (extraIds?.length) {
+      qs.set('workspaceIds', [...new Set([workspaceId, ...extraIds])].join(','))
+    } else {
+      qs.set('workspaceId', workspaceId)
+    }
+    Object.entries(rest).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)) })
     return get<{ tasks: Task[] }>(`/api/tasks?${qs}`)
   },
   get: (id: string) => get<Task>(`/api/tasks/${id}`),
@@ -212,7 +222,11 @@ export const audio = {
       recordingId: string; transcriptId: string | null; rawText: string; runId: string | null; error?: string
     }>
   },
-  list: (workspaceId: string) => get<{ recordings: AudioRecording[] }>(`/api/audio?workspaceId=${workspaceId}`),
+  list: (workspaceId: string, extraIds?: string[]) => {
+    const ids = extraIds?.length ? [...new Set([workspaceId, ...extraIds])] : null
+    const qs = ids ? `workspaceIds=${ids.join(',')}` : `workspaceId=${workspaceId}`
+    return get<{ recordings: AudioRecording[] }>(`/api/audio?${qs}`)
+  },
   listByTask: (taskId: string) => get<{ recordings: AudioRecording[] }>(`/api/audio/task/${taskId}`),
   delete: (id: string) => del(`/api/audio/${id}`),
 }

@@ -150,14 +150,17 @@ r.get('/task/:taskId', requireAuth, async (c) => {
   return c.json({ recordings: data ?? [] })
 })
 
-// GET /api/audio?workspaceId=
+// GET /api/audio?workspaceId=&workspaceIds=id1,id2
 r.get('/', requireAuth, async (c) => {
   const workspaceId = c.req.query('workspaceId')
-  if (!workspaceId) return c.json({ error: 'workspaceId required' }, 400)
+  const workspaceIds = c.req.query('workspaceIds')
+  if (!workspaceId && !workspaceIds) return c.json({ error: 'workspaceId required' }, 400)
+
+  const ids = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId!]
 
   const { data, error } = await (lf('audio_recordings') as any)
     .select('*, transcripts(id, raw_text, confidence_score, created_at)')
-    .eq('workspace_id', workspaceId)
+    .in('workspace_id', ids)
     .order('created_at', { ascending: false })
     .limit(50)
 
