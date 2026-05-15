@@ -4,6 +4,9 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { settings as settingsApi, type Setting, type ModelOption } from '@/lib/api'
+import { UsersPage } from './UsersPage'
+import { GroupsPage } from './GroupsPage'
+import { ConfigMatrixPage } from './ConfigMatrixPage'
 
 // ── Model picklist ──────────────────────────────────────────────
 function ModelSelect({
@@ -200,7 +203,17 @@ const PROVIDERS = [
   { id: 'gemini', label: 'Google Gemini' },
 ]
 
+type SettingsTab = 'general' | 'users' | 'groups' | 'permissions'
+
+const TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'general', label: 'General' },
+  { key: 'users', label: 'Users' },
+  { key: 'groups', label: 'Groups' },
+  { key: 'permissions', label: 'Permissions' },
+]
+
 export function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [settingsList, setSettingsList] = useState<Setting[]>([])
   const [geminiModels, setGeminiModels] = useState<ModelOption[]>([])
   const [deepgramModels, setDeepgramModels] = useState<ModelOption[]>([])
@@ -249,13 +262,38 @@ export function SettingsPage() {
       <TopBar
         title="Settings"
         actions={
-          <button onClick={load} className="p-2 text-ios-gray-1 hover:bg-ios-gray-5 rounded-ios transition-colors">
-            <RefreshCw size={16} />
-          </button>
+          activeTab === 'general' ? (
+            <button onClick={load} className="p-2 text-ios-gray-1 hover:bg-ios-gray-5 rounded-ios transition-colors">
+              <RefreshCw size={16} />
+            </button>
+          ) : undefined
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-2xl">
+      {/* Tab bar */}
+      <div className="shrink-0 flex gap-1 px-4 pt-3 border-b border-ios-gray-5 bg-white">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-ios transition-colors border-b-2 -mb-px ${
+              activeTab === t.key
+                ? 'border-[var(--ws-color,#007AFF)] text-[var(--ws-color,#007AFF)]'
+                : 'border-transparent text-ios-gray-1 hover:text-ios-label'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Users */}
+      {activeTab === 'users' && <UsersPage embedded />}
+      {activeTab === 'groups' && <GroupsPage embedded />}
+      {activeTab === 'permissions' && <ConfigMatrixPage embedded />}
+
+      {/* Tab: General */}
+      {activeTab === 'general' && <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-2xl">
         {/* Status banner */}
         {status && (
           <div className="flex items-center gap-4 bg-white rounded-ios-lg p-4 shadow-ios text-sm">
@@ -407,7 +445,7 @@ export function SettingsPage() {
             <p className="text-xs text-ios-gray-1 mt-1">Notion-like workspace with audio + AI</p>
           </CardBody>
         </Card>
-      </div>
+      </div>}
     </div>
   )
 }

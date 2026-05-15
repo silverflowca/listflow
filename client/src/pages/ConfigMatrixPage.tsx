@@ -55,7 +55,7 @@ const DEFAULT_MAP: MatrixMap = (() => {
   return m
 })()
 
-export function ConfigMatrixPage() {
+export function ConfigMatrixPage({ embedded }: { embedded?: boolean } = {}) {
   const [matrix, setMatrix] = useState<MatrixMap>(JSON.parse(JSON.stringify(DEFAULT_MAP)))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -117,11 +117,30 @@ export function ConfigMatrixPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar
-        title="Access Configuration"
-        subtitle="Feature access per role"
-        accentColor="#5e3aa0"
-      />
+      {!embedded && (
+        <TopBar
+          title="Access Configuration"
+          subtitle="Feature access per role"
+          accentColor="#5e3aa0"
+        />
+      )}
+
+      {embedded && (
+        <div className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-ios-gray-5">
+          <span className="text-sm font-medium text-ios-label">Feature Access by Role</span>
+          <div className="flex items-center gap-2">
+            {dirty && <button onClick={reset} className="p-1.5 text-ios-gray-1 hover:bg-ios-gray-5 rounded-ios transition-colors" title="Reset"><RotateCcw size={14} /></button>}
+            <button
+              onClick={save}
+              disabled={saving || !dirty}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-ios border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 disabled:opacity-40 transition-colors"
+            >
+              <Save size={13} />
+              {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (

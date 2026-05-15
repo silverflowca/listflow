@@ -13,7 +13,7 @@ const FAKE_USER_ID = '00000000-0000-0000-0000-000000000000'
 
 const GROUP_COLORS = ['#5e3aa0', '#1e5799', '#2e7d32', '#c62828', '#e65100', '#00838f', '#4527a0']
 
-export function GroupsPage() {
+export function GroupsPage({ embedded }: { embedded?: boolean } = {}) {
   const [list, setList] = useState<UserGroup[]>([])
   const [allUsers, setAllUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,12 +49,21 @@ export function GroupsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar
-        title="Groups"
-        subtitle="Organise users into teams"
-        accentColor="#1e5799"
-        actions={<Button size="sm" onClick={() => setAddOpen(true)}>+ New Group</Button>}
-      />
+      {!embedded && (
+        <TopBar
+          title="Groups"
+          subtitle="Organise users into teams"
+          accentColor="#1e5799"
+          actions={<Button size="sm" onClick={() => setAddOpen(true)}>+ New Group</Button>}
+        />
+      )}
+
+      {embedded && (
+        <div className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-ios-gray-5">
+          <span className="text-sm font-medium text-ios-label">User Groups</span>
+          <Button size="sm" onClick={() => setAddOpen(true)}>+ New Group</Button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (

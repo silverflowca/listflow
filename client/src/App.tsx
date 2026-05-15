@@ -13,9 +13,6 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { PageView } from '@/pages/PageView'
 import { PagesListPage } from '@/pages/PagesListPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
-import { UsersPage } from '@/pages/UsersPage'
-import { GroupsPage } from '@/pages/GroupsPage'
-import { ConfigMatrixPage } from '@/pages/ConfigMatrixPage'
 
 export default function App() {
   return (
@@ -35,9 +32,9 @@ export default function App() {
               <Route path="/pages/:id" element={<PageView />} />
               <Route path="/workspace" element={<WorkspacePage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/groups" element={<GroupsPage />} />
-              <Route path="/admin/config" element={<ConfigMatrixPage />} />
+              <Route path="/users" element={<Navigate to="/settings" replace />} />
+              <Route path="/groups" element={<Navigate to="/settings" replace />} />
+              <Route path="/admin/config" element={<Navigate to="/settings" replace />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

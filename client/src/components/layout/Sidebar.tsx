@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Home, FileText, Database, CheckSquare, Mic, Settings,
-  ChevronLeft, ChevronRight, Plus, Users, Folder, UsersRound, ShieldCheck, LayoutGrid, HelpCircle, LogOut,
-  ChevronDown, ChevronRight as ChevronRightSm, FolderOpen,
+  Home, FileText, CheckSquare, Mic, Settings,
+  ChevronLeft, ChevronRight, Plus, Users, Folder, LayoutGrid, HelpCircle, LogOut,
+  ChevronDown, FolderOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspace, workspacePalette, type WorkspaceNode } from '@/contexts/WorkspaceContext'
@@ -15,14 +15,9 @@ import type { Workspace } from '@/lib/api'
 const NAV = [
   { to: '/', icon: Home, label: 'Home', exact: true },
   { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
+  { to: '/pages', icon: FileText, label: 'Documents' },
   { to: '/audio', icon: Mic, label: 'Audio & AI' },
   { to: '/settings', icon: Settings, label: 'Settings' },
-]
-
-const ADMIN_NAV = [
-  { to: '/users', icon: Users, label: 'Users' },
-  { to: '/groups', icon: UsersRound, label: 'Groups' },
-  { to: '/admin/config', icon: ShieldCheck, label: 'Permissions' },
 ]
 
 // ── Recursive workspace tree node ─────────────────────────────────────────────
@@ -150,7 +145,7 @@ export function Sidebar() {
 
       {/* Workspace picker */}
       {!collapsed && (
-        <div className="px-2 py-2 border-b border-ios-gray-5 overflow-y-auto max-h-60">
+        <div className="px-2 py-2 border-b border-ios-gray-5 overflow-y-auto max-h-96">
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-medium text-ios-gray-1 uppercase tracking-wide">Workspace Config</span>
             <NavLink to="/workspace" className="text-ios-gray-2 hover:ws-text transition-colors" title="Manage workspaces">
@@ -200,53 +195,6 @@ export function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Pages section */}
-        {!collapsed && activeWorkspace && (
-          <div className="mt-3">
-            <div className="text-xs font-medium text-ios-gray-1 px-2 py-1 uppercase tracking-wide flex items-center justify-between">
-              <span>Pages</span>
-              <NavLink to="/pages/new" className="hover:ws-text transition-colors">
-                <Plus size={12} />
-              </NavLink>
-            </div>
-            <NavLink
-              to="/pages"
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-2 py-1.5 rounded-ios text-sm transition-colors',
-                isActive ? 'font-medium' : 'text-ios-secondary hover:bg-ios-gray-6',
-              )}
-              style={({ isActive }) => isActive ? {
-                backgroundColor: 'var(--ws-color-light)',
-                color: 'var(--ws-color)',
-              } : {}}
-            >
-              <Folder size={16} />
-              <span>All Pages</span>
-            </NavLink>
-          </div>
-        )}
-
-        {/* Admin section */}
-        <div className="mt-3">
-          {!collapsed && (
-            <div className="text-xs font-medium text-ios-gray-1 px-2 py-1 uppercase tracking-wide">Admin</div>
-          )}
-          {ADMIN_NAV.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) => cn(
-                'flex items-center gap-3 px-2 py-2 rounded-ios text-sm transition-colors',
-                isActive
-                  ? 'bg-purple-100/60 text-purple-700 font-medium'
-                  : 'text-ios-secondary hover:bg-ios-gray-6',
-              )}
-            >
-              <Icon size={18} className="shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </div>
       </nav>
 
       {/* Footer */}

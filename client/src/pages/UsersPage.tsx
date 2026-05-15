@@ -11,7 +11,7 @@ import type { AppUser, AppRole } from '@/lib/api'
 
 const ROLES: AppRole[] = ['admin', 'manager', 'member', 'viewer', 'guest']
 
-export function UsersPage() {
+export function UsersPage({ embedded }: { embedded?: boolean } = {}) {
   const [list, setList] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,12 +45,21 @@ export function UsersPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar
-        title="Users"
-        subtitle="Manage team members and roles"
-        accentColor="#5e3aa0"
-        actions={<Button size="sm" onClick={() => setAddOpen(true)}>+ Add User</Button>}
-      />
+      {!embedded && (
+        <TopBar
+          title="Users"
+          subtitle="Manage team members and roles"
+          accentColor="#5e3aa0"
+          actions={<Button size="sm" onClick={() => setAddOpen(true)}>+ Add User</Button>}
+        />
+      )}
+
+      {embedded && (
+        <div className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-ios-gray-5">
+          <span className="text-sm font-medium text-ios-label">Team Members</span>
+          <Button size="sm" onClick={() => setAddOpen(true)}>+ Add User</Button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6">
         {error && <div className="mb-4 text-sm text-ios-red bg-red-50 p-3 rounded-lg">{error}</div>}

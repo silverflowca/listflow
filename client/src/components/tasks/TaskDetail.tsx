@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tasks as tasksApi, audio as audioApi, type Task, type Subtask, type Comment, type AudioRecording } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -40,6 +40,14 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
   const [recording, setRecording] = useState(false)
   const [audioError, setAudioError] = useState('')
   const [expandedTranscripts, setExpandedTranscripts] = useState<Record<string, boolean>>({})
+
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -422,6 +430,17 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="shrink-0 px-5 py-3 border-t border-ios-gray-5 flex justify-end">
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-ios border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
+        >
+          {copied ? <Check size={13} className="text-ios-green" /> : <Share2 size={13} />}
+          {copied ? 'Copied!' : 'Share'}
+        </button>
       </div>
     </div>
   )

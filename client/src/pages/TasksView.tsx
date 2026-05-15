@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare, FileText, Mic } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare, FileText, Mic, Share2 } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -52,9 +52,10 @@ interface TaskRowProps {
   task: Task
   workspaceList: import('@/lib/api').Workspace[]
   onClick: () => void
+  onShare: () => void
 }
 
-function TaskRow({ task, workspaceList, onClick }: TaskRowProps) {
+function TaskRow({ task, workspaceList, onClick, onShare }: TaskRowProps) {
   const completedSubs = task.subtasks?.filter(s => s.completed).length ?? 0
   const totalSubs = task.subtasks?.length ?? 0
   const ws = workspaceList.find(w => w.id === task.workspace_id)
@@ -132,6 +133,15 @@ function TaskRow({ task, workspaceList, onClick }: TaskRowProps) {
           {task.comments!.length}
         </span>
       )}
+
+      {/* Share */}
+      <button
+        onClick={e => { e.stopPropagation(); onShare() }}
+        className="p-1.5 text-ios-gray-3 hover:text-ios-blue hover:bg-ios-gray-5 rounded-ios transition-all shrink-0"
+        title="Copy link"
+      >
+        <Share2 size={13} />
+      </button>
     </div>
   )
 }
@@ -476,13 +486,14 @@ export function TasksView() {
         subtitle={`${filtered.length} task${filtered.length !== 1 ? 's' : ''}${allTasks.length !== filtered.length ? ` of ${allTasks.length}` : ''}`}
         actions={
           <div className="flex items-center gap-2">
+            {/* Always-visible nav shortcuts */}
             <Link
               to="/pages"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-ios text-xs font-medium text-ios-gray-1 hover:bg-ios-gray-5 transition-colors"
               title="Go to Docs"
             >
               <FileText size={14} />
-              <span className="hidden sm:block">Docs</span>
+              <span>Docs</span>
             </Link>
             <Link
               to="/audio"
@@ -490,7 +501,7 @@ export function TasksView() {
               title="Go to Recordings"
             >
               <Mic size={14} />
-              <span className="hidden sm:block">Recordings</span>
+              <span>Recordings</span>
             </Link>
             <div className="w-px h-5 bg-ios-gray-5" />
             <button
@@ -618,6 +629,9 @@ export function TasksView() {
                   task={task}
                   workspaceList={workspaceList}
                   onClick={() => setSelectedTask(task)}
+                  onShare={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`)
+                  }}
                 />
               ))
             )}
