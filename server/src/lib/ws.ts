@@ -10,6 +10,8 @@ export type LfWsEventType =
   | 'agent.done'
   | 'agent.failed'
   | 'transcript.ready'
+  | 'chat.message'
+  | 'chat.typing'
   | 'ping'
 
 export interface LfWsEvent {
@@ -73,3 +75,9 @@ export const emitAgentFailed = (runId: string, error: string) =>
 
 export const emitTranscriptReady = (recordingId: string, transcriptId: string, rawText: string) =>
   emit('transcript.ready', { recordingId, transcriptId, rawText })
+
+export const emitChatMessage = (msg: Record<string, unknown>) =>
+  emit('chat.message', { message: msg })
+
+export const emitChatTyping = (channelId: string, userId: string, name: string) =>
+  emit('chat.typing', { channelId, userId, name })

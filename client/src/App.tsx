@@ -13,6 +13,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { PageView } from '@/pages/PageView'
 import { PagesListPage } from '@/pages/PagesListPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
+import { ChatView } from '@/pages/ChatView'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<HomePage />} />
               <Route path="/tasks" element={<TasksView />} />
+              <Route path="/chat" element={<ChatView />} />
               <Route path="/audio" element={<AudioView />} />
               <Route path="/pages" element={<PagesListPage />} />
               <Route path="/pages/:id" element={<PageView />} />

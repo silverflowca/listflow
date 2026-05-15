@@ -238,6 +238,17 @@ export const agent = {
   memory: (workspaceId: string) => get<{ memory: { key: string; value: string }[] }>(`/api/agent/memory?workspaceId=${workspaceId}`),
 }
 
+export interface ChatChannel {
+  id: string; workspace_id: string; name: string; description?: string
+  created_by: string; created_at: string
+}
+
+export interface ChatMessage {
+  id: string; channel_id: string; workspace_id: string; user_id: string
+  body: string; file_url?: string; file_name?: string; file_type?: string
+  task_id?: string; created_at: string; updated_at: string
+}
+
 export interface ModelOption { id: string; label: string; group: string }
 export interface ModelsResponse { gemini: ModelOption[]; deepgram: ModelOption[] }
 
@@ -268,6 +279,36 @@ export const configMatrix = {
   upsert: (b: { feature: string; role: AppRole; enabled: boolean; updatedBy?: string }) => req<ConfigMatrixRow>('PUT', '/api/admin/config', b),
   bulkUpsert: (rows: { feature: string; role: AppRole; enabled: boolean }[]) =>
     req<{ matrix: ConfigMatrixRow[] }>('PUT', '/api/admin/config/bulk', { rows }),
+}
+
+export const chat = {
+  channels: (workspaceId: string) =>
+    get<{ channels: ChatChannel[] }>(`/api/chat/channels?workspaceId=${workspaceId}`),
+  createChannel: (b: { workspaceId: string; name: string; description?: string }) =>
+    post<ChatChannel>('/api/chat/channels', b),
+  messages: (channelId: string, before?: string) =>
+    get<{ messages: ChatMessage[] }>(`/api/chat/channels/${channelId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`),
+  send: (channelId: string, body: string) =>
+    post<ChatMessage>(`/api/chat/channels/${channelId}/messages`, { body }),
+  upload: async (channelId: string, file: File): Promise<ChatMessage> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const fd = new FormData()
+    fd.append('file', file)
+    const r = await fetch(`${BASE}/api/chat/channels/${channelId}/upload`, {
+      method: 'POST',
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      body: fd,
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({})) as { error?: string }
+      throw new Error(err.error ?? `HTTP ${r.status}`)
+    }
+    return r.json()
+  },
+  pinAsTask: (channelId: string, messageId: string, workspaceId: string) =>
+    post<{ task: Task; message: ChatMessage }>(`/api/chat/channels/${channelId}/pin-task`, { messageId, workspaceId }),
+  typing: (channelId: string, name?: string) =>
+    post<{ ok: boolean }>('/api/chat/typing', { channelId, name }),
 }
 
 export const settings = {

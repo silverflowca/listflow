@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Home, FileText, CheckSquare, Mic, Settings,
+  Home, FileText, CheckSquare, Mic, Settings, MessageSquare,
   ChevronLeft, ChevronRight, Plus, Users, Folder, LayoutGrid, HelpCircle, LogOut,
   ChevronDown, FolderOpen,
 } from 'lucide-react'
@@ -15,6 +15,7 @@ import type { Workspace } from '@/lib/api'
 const NAV = [
   { to: '/', icon: Home, label: 'Home', exact: true },
   { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
+  { to: '/chat', icon: MessageSquare, label: 'Chat' },
   { to: '/pages', icon: FileText, label: 'Documents' },
   { to: '/audio', icon: Mic, label: 'Audio & AI' },
   { to: '/settings', icon: Settings, label: 'Settings' },

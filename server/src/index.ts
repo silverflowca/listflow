@@ -19,6 +19,7 @@ import settingsRouter from './routes/settings.js'
 import usersRouter from './routes/users.js'
 import groupsRouter from './routes/groups.js'
 import configMatrixRouter from './routes/configMatrix.js'
+import chatRouter from './routes/chat.js'
 
 // In single-service Railway deploys, NODE_PORT is always 3016 (internal, nginx proxies to it).
 // Railway's PORT env var is reserved for the public-facing nginx listener.
@@ -60,6 +61,7 @@ app.route('/api/settings', settingsRouter)
 app.route('/api/users', usersRouter)
 app.route('/api/groups', groupsRouter)
 app.route('/api/admin/config', configMatrixRouter)
+app.route('/api/chat', chatRouter)
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 

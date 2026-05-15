@@ -9,6 +9,8 @@ export type LfWsEventType =
   | 'agent.done'
   | 'agent.failed'
   | 'transcript.ready'
+  | 'chat.message'
+  | 'chat.typing'
   | 'ping'
 
 export interface LfWsEvent {
