@@ -432,17 +432,17 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <div className="shrink-0 px-5 py-3 border-t border-ios-gray-5 flex justify-end">
-        <button
-          onClick={() => { if (confirm('Delete this task?')) onDelete() }}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-ios bg-red-50 border border-red-200 text-ios-red hover:bg-red-100 transition-colors"
-        >
-          <Trash2 size={13} />
-          Delete
-        </button>
+        {/* Footer */}
+        <div className="shrink-0 px-5 py-3 border-t border-ios-gray-5 flex justify-end">
+          <button
+            onClick={() => { if (confirm('Delete this task?')) onDelete() }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-ios bg-red-50 border border-red-200 text-ios-red hover:bg-red-100 transition-colors"
+          >
+            <Trash2 size={13} />
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   )
