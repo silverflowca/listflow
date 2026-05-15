@@ -42,6 +42,7 @@ function WorkspaceTreeNode({
   const hasChildren = node.children.length > 0
   const [open, setOpen] = useState(isActive || node.children.some(c => c.id === activeWorkspace?.id))
   const wsPalette = workspacePalette(node)
+  const navigate = useNavigate()
 
   return (
     <div>
@@ -49,6 +50,7 @@ function WorkspaceTreeNode({
         onClick={() => {
           setActiveWorkspace(node)
           if (hasChildren) setOpen(o => !o)
+          navigate('/tasks')
         }}
         className={cn(
           'w-full flex items-center gap-1.5 py-1.5 rounded-ios text-sm transition-colors',

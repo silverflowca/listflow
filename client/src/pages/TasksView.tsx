@@ -297,7 +297,7 @@ function WorkspaceFilter({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TasksView() {
-  const { workspaceList, activeWorkspace } = useWorkspace()
+  const { workspaceList, activeWorkspace, activeDescendantIds } = useWorkspace()
   const { subscribe } = useWs()
 
   // All tasks across all workspaces
@@ -310,6 +310,15 @@ export function TasksView() {
   const [search, setSearch] = useState('')
   const [wsFilter, setWsFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<Task['status'][]>([])
+
+  // Auto-sync workspace filter when active workspace changes
+  useEffect(() => {
+    if (activeWorkspace) {
+      setWsFilter([activeWorkspace.id, ...activeDescendantIds])
+    } else {
+      setWsFilter([])
+    }
+  }, [activeWorkspace?.id, activeDescendantIds.join(',')])
   const [priorityFilter, setPriorityFilter] = useState<Task['priority'][]>([])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
