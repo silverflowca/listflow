@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare, FileText, Mic } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -475,6 +476,23 @@ export function TasksView() {
         subtitle={`${filtered.length} task${filtered.length !== 1 ? 's' : ''}${allTasks.length !== filtered.length ? ` of ${allTasks.length}` : ''}`}
         actions={
           <div className="flex items-center gap-2">
+            <Link
+              to="/pages"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-ios text-xs font-medium text-ios-gray-1 hover:bg-ios-gray-5 transition-colors"
+              title="Go to Docs"
+            >
+              <FileText size={14} />
+              <span className="hidden sm:block">Docs</span>
+            </Link>
+            <Link
+              to="/audio"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-ios text-xs font-medium text-ios-gray-1 hover:bg-ios-gray-5 transition-colors"
+              title="Go to Recordings"
+            >
+              <Mic size={14} />
+              <span className="hidden sm:block">Recordings</span>
+            </Link>
+            <div className="w-px h-5 bg-ios-gray-5" />
             <button
               onClick={() => setView('list')}
               className={`p-2 rounded-ios transition-colors ${view === 'list' ? 'ws-btn-primary' : 'text-ios-gray-1 hover:bg-ios-gray-5'}`}
