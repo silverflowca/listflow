@@ -305,6 +305,158 @@ function WorkspaceFilter({
   )
 }
 
+// ── Status filter dropdown (mobile pill) ─────────────────────────────────────
+
+function StatusFilter({
+  selected,
+  onChange,
+  countByStatus,
+}: {
+  selected: Task['status'][]
+  onChange: (v: Task['status'][]) => void
+  countByStatus: Record<string, number>
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (v: Task['status']) =>
+    onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v])
+
+  const label = selected.length === 0
+    ? 'Status'
+    : selected.length === 1
+      ? STATUS_OPTS.find(o => o.value === selected[0])?.label ?? 'Status'
+      : `Status (${selected.length})`
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all duration-150"
+        style={selected.length > 0 ? {
+          backgroundColor: 'var(--ws-color-light)',
+          borderColor: 'var(--ws-color)',
+          color: 'var(--ws-color)',
+          fontWeight: 600,
+        } : {
+          backgroundColor: 'white',
+          borderColor: '#D1D1D6',
+          color: '#8E8E93',
+        }}
+      >
+        {selected.length > 0 && <X size={10} onClick={e => { e.stopPropagation(); onChange([]) }} />}
+        {label}
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white rounded-ios shadow-ios-lg border border-ios-gray-5 z-50 min-w-44 py-1">
+          {STATUS_OPTS.map(o => {
+            const active = selected.includes(o.value)
+            const count = countByStatus[o.value]
+            return (
+              <button
+                key={o.value}
+                onClick={() => toggle(o.value)}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-ios-gray-6 flex items-center gap-2"
+              >
+                <span className="flex-1 text-ios-label" style={active ? { fontWeight: 600, color: 'var(--ws-color)' } : {}}>{o.label}</span>
+                {count > 0 && <span className="text-ios-gray-3">{count}</span>}
+                {active && <span style={{ color: 'var(--ws-color)' }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Priority filter dropdown (mobile pill) ────────────────────────────────────
+
+const PRIORITY_COLORS: Record<Task['priority'], string> = {
+  urgent: '#FF3B30', high: '#FF9500', medium: 'var(--ws-color,#007AFF)', low: '#8E8E93',
+}
+
+function PriorityFilter({
+  selected,
+  onChange,
+}: {
+  selected: Task['priority'][]
+  onChange: (v: Task['priority'][]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (v: Task['priority']) =>
+    onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v])
+
+  const label = selected.length === 0
+    ? 'Priority'
+    : selected.length === 1
+      ? PRIORITY_OPTS.find(o => o.value === selected[0])?.label ?? 'Priority'
+      : `Priority (${selected.length})`
+
+  const activeColor = selected.length === 1 ? PRIORITY_COLORS[selected[0]] : undefined
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all duration-150"
+        style={selected.length > 0 ? {
+          backgroundColor: activeColor ? `${activeColor}18` : 'var(--ws-color-light)',
+          borderColor: activeColor ?? 'var(--ws-color)',
+          color: activeColor ?? 'var(--ws-color)',
+          fontWeight: 600,
+        } : {
+          backgroundColor: 'white',
+          borderColor: '#D1D1D6',
+          color: '#8E8E93',
+        }}
+      >
+        {selected.length > 0 && <X size={10} onClick={e => { e.stopPropagation(); onChange([]) }} />}
+        {label}
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white rounded-ios shadow-ios-lg border border-ios-gray-5 z-50 min-w-40 py-1">
+          {PRIORITY_OPTS.map(o => {
+            const active = selected.includes(o.value)
+            const color = PRIORITY_COLORS[o.value]
+            return (
+              <button
+                key={o.value}
+                onClick={() => toggle(o.value)}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-ios-gray-6 flex items-center gap-2"
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="flex-1 text-ios-label" style={active ? { fontWeight: 600, color } : {}}>{o.label}</span>
+                {active && <span style={{ color }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TasksView() {
@@ -579,44 +731,61 @@ export function TasksView() {
           )}
         </div>
 
-        {/* Row 2: filter chips */}
+        {/* Row 2: filter chips — dropdowns on mobile, individual chips on sm+ */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Workspace */}
+          {/* Workspace — always a dropdown */}
           <WorkspaceFilter workspaceList={workspaceList} selected={wsFilter} onChange={setWsFilter} />
 
           <div className="w-px h-4 bg-ios-gray-4 mx-1" />
 
-          {/* Status chips */}
-          {STATUS_OPTS.map(o => (
-            <Chip
-              key={o.value}
-              value={o.value}
-              label={`${o.label}${countByStatus[o.value] ? ` ${countByStatus[o.value]}` : ''}`}
-              active={statusFilter.includes(o.value)}
-              onClick={() => setStatusFilter(prev =>
-                prev.includes(o.value) ? prev.filter(s => s !== o.value) : [...prev, o.value]
-              )}
+          {/* Status — dropdown on mobile, chips on sm+ */}
+          <div className="sm:hidden">
+            <StatusFilter
+              selected={statusFilter}
+              onChange={setStatusFilter}
+              countByStatus={countByStatus}
             />
-          ))}
-
-          <div className="w-px h-4 bg-ios-gray-4 mx-1" />
-
-          {/* Priority chips */}
-          {PRIORITY_OPTS.map(o => {
-            const colors: Record<string, string> = { urgent: '#FF3B30', high: '#FF9500', medium: 'var(--ws-color,#007AFF)', low: '#8E8E93' }
-            return (
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5">
+            {STATUS_OPTS.map(o => (
               <Chip
                 key={o.value}
                 value={o.value}
-                label={o.label}
-                active={priorityFilter.includes(o.value)}
-                color={colors[o.value]}
-                onClick={() => setPriorityFilter(prev =>
-                  prev.includes(o.value) ? prev.filter(p => p !== o.value) : [...prev, o.value]
+                label={`${o.label}${countByStatus[o.value] ? ` ${countByStatus[o.value]}` : ''}`}
+                active={statusFilter.includes(o.value)}
+                onClick={() => setStatusFilter(prev =>
+                  prev.includes(o.value) ? prev.filter(s => s !== o.value) : [...prev, o.value]
                 )}
               />
-            )
-          })}
+            ))}
+          </div>
+
+          <div className="w-px h-4 bg-ios-gray-4 mx-1" />
+
+          {/* Priority — dropdown on mobile, chips on sm+ */}
+          <div className="sm:hidden">
+            <PriorityFilter
+              selected={priorityFilter}
+              onChange={setPriorityFilter}
+            />
+          </div>
+          <div className="hidden sm:flex items-center gap-1.5">
+            {PRIORITY_OPTS.map(o => {
+              const colors: Record<string, string> = { urgent: '#FF3B30', high: '#FF9500', medium: 'var(--ws-color,#007AFF)', low: '#8E8E93' }
+              return (
+                <Chip
+                  key={o.value}
+                  value={o.value}
+                  label={o.label}
+                  active={priorityFilter.includes(o.value)}
+                  color={colors[o.value]}
+                  onClick={() => setPriorityFilter(prev =>
+                    prev.includes(o.value) ? prev.filter(p => p !== o.value) : [...prev, o.value]
+                  )}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
 
