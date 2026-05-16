@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud, CheckSquare, CalendarDays, AlertCircle } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -599,6 +599,223 @@ function TaskPickerPopover({
   )
 }
 
+// ── Natural date parser ────────────────────────────────────────────────────────
+
+function parseNaturalDate(s: string): string | undefined {
+  if (!s?.trim()) return undefined
+  const raw = s.trim().toLowerCase()
+  const now = new Date()
+
+  // Time-only: "2pm", "14:30", "9am", "3:45pm"
+  const timeMatch = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/)
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1])
+    const m = parseInt(timeMatch[2] ?? '0')
+    const ampm = timeMatch[3]
+    if (ampm === 'pm' && h < 12) h += 12
+    if (ampm === 'am' && h === 12) h = 0
+    const d = new Date(now)
+    d.setHours(h, m, 0, 0)
+    return d.toISOString()
+  }
+
+  // Day names: "monday", "mon", "tuesday", "tue", etc.
+  const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+  const SHORT_DAYS = ['sun','mon','tue','wed','thu','fri','sat']
+  let dayIdx = DAYS.indexOf(raw)
+  if (dayIdx === -1) dayIdx = SHORT_DAYS.indexOf(raw)
+  if (dayIdx !== -1) {
+    const d = new Date(now)
+    const diff = (dayIdx - d.getDay() + 7) % 7 || 7 // always next occurrence
+    d.setDate(d.getDate() + diff)
+    d.setHours(9, 0, 0, 0)
+    return d.toISOString()
+  }
+
+  // "today", "tomorrow"
+  if (raw === 'today') { const d = new Date(now); d.setHours(23, 59, 0, 0); return d.toISOString() }
+  if (raw === 'tomorrow') { const d = new Date(now); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.toISOString() }
+  if (raw === 'next week') { const d = new Date(now); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d.toISOString() }
+
+  // Slash/dash dates: "10/5/2026", "10/5", "2026-10-05"
+  const slashMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/)
+  if (slashMatch) {
+    const month = parseInt(slashMatch[1]) - 1
+    const day = parseInt(slashMatch[2])
+    const year = slashMatch[3] ? parseInt(slashMatch[3].length === 2 ? '20' + slashMatch[3] : slashMatch[3]) : now.getFullYear()
+    const d = new Date(year, month, day, 9, 0, 0)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+
+  // ISO-ish: "2026-10-05"
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    const d = new Date(`${raw}T09:00:00`)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+
+  return undefined
+}
+
+function formatDatePreview(iso: string | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const opts: Intl.DateTimeFormatOptions = isToday
+    ? { hour: 'numeric', minute: '2-digit' }
+    : { weekday: 'short', month: 'short', day: 'numeric' }
+  return d.toLocaleString([], opts)
+}
+
+// ── Task Create Popover ────────────────────────────────────────────────────────
+
+interface BangFields {
+  title: string
+  description: string
+  dueDateRaw: string
+  priority: Task['priority']
+}
+
+function TaskCreatePopover({
+  fields,
+  onFieldChange,
+  onSubmit,
+  onClose,
+  creating,
+}: {
+  fields: BangFields
+  onFieldChange: (f: Partial<BangFields>) => void
+  onSubmit: () => void
+  onClose: () => void
+  creating: boolean
+}) {
+  const PRIORITIES: Task['priority'][] = ['low', 'medium', 'high', 'urgent']
+  const PRIORITY_LABELS: Record<Task['priority'], string> = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' }
+  const PRIORITY_COLORS: Record<Task['priority'], string> = {
+    low: 'text-ios-gray-3 border-ios-gray-4',
+    medium: 'text-ios-blue border-ios-blue/40',
+    high: 'text-ios-orange border-orange-300',
+    urgent: 'text-ios-red border-red-300',
+  }
+
+  const parsedDate = parseNaturalDate(fields.dueDateRaw)
+  const datePreview = formatDatePreview(parsedDate)
+
+  const titleRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { titleRef.current?.focus() }, [])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') { e.preventDefault(); onClose() }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSubmit() }
+  }
+
+  return (
+    <div
+      className="absolute bottom-full left-0 right-0 mb-2 mx-4 bg-white border border-ios-gray-4 rounded-2xl shadow-xl overflow-hidden z-50"
+      onKeyDown={handleKeyDown}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-ios-gray-5 bg-ios-gray-6/50">
+        <CheckSquare size={14} className="text-[var(--ws-color,#007AFF)] shrink-0" />
+        <span className="text-xs font-semibold text-ios-label">Quick Task</span>
+        <span className="text-[11px] text-ios-gray-3 ml-1">⌘↵ to create</span>
+        <button
+          onMouseDown={e => { e.preventDefault(); onClose() }}
+          className="ml-auto text-ios-gray-3 hover:text-ios-gray-1 transition-colors p-0.5"
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Title */}
+        <div>
+          <input
+            ref={titleRef}
+            value={fields.title}
+            onChange={e => onFieldChange({ title: e.target.value })}
+            placeholder="Task title…"
+            className="w-full text-sm font-medium text-ios-label rounded-xl border border-ios-gray-4 bg-ios-gray-6 px-3 py-2 outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors placeholder:text-ios-gray-3"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <textarea
+            value={fields.description}
+            onChange={e => onFieldChange({ description: e.target.value })}
+            placeholder="Description (optional)…"
+            rows={2}
+            className="w-full text-xs text-ios-label rounded-xl border border-ios-gray-4 bg-ios-gray-6 px-3 py-2 outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors resize-none placeholder:text-ios-gray-3"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          {/* Due date */}
+          <div className="flex-1">
+            <div className="relative">
+              <CalendarDays size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ios-gray-3 pointer-events-none" />
+              <input
+                value={fields.dueDateRaw}
+                onChange={e => onFieldChange({ dueDateRaw: e.target.value })}
+                placeholder="Due: friday, 2pm, 10/5…"
+                className="w-full text-xs text-ios-label rounded-xl border border-ios-gray-4 bg-ios-gray-6 pl-7 pr-3 py-2 outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors placeholder:text-ios-gray-3"
+              />
+            </div>
+            {fields.dueDateRaw && (
+              <p className="text-[11px] mt-0.5 pl-1" style={{ color: parsedDate ? 'var(--ws-color,#007AFF)' : '#FF3B30' }}>
+                {parsedDate ? `→ ${datePreview}` : 'Unrecognised date'}
+              </p>
+            )}
+          </div>
+
+          {/* Priority picker */}
+          <div className="w-28">
+            <div className="relative">
+              <AlertCircle size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ios-gray-3 pointer-events-none" />
+              <select
+                value={fields.priority}
+                onChange={e => onFieldChange({ priority: e.target.value as Task['priority'] })}
+                className={cn(
+                  'w-full text-xs rounded-xl border bg-ios-gray-6 pl-7 pr-2 py-2 outline-none transition-colors appearance-none',
+                  PRIORITY_COLORS[fields.priority]
+                )}
+              >
+                {PRIORITIES.map(p => (
+                  <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-ios-gray-5 bg-ios-gray-6/30">
+        <p className="text-[11px] text-ios-gray-3">
+          Tip: <span className="font-mono bg-ios-gray-5 px-1 rounded">!title !!desc !!fri !!urgent</span>
+        </p>
+        <div className="flex gap-2">
+          <button
+            onMouseDown={e => { e.preventDefault(); onClose() }}
+            className="text-xs px-3 py-1.5 rounded-lg text-ios-gray-2 hover:bg-ios-gray-5 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onMouseDown={e => { e.preventDefault(); onSubmit() }}
+            disabled={!fields.title.trim() || creating}
+            className="text-xs px-3 py-1.5 rounded-lg bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
+          >
+            {creating ? 'Creating…' : 'Create Task'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Pending file preview strip ────────────────────────────────────────────────
 
 interface PendingFile {
@@ -672,10 +889,15 @@ function MessageInput({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+  // ! quick-task state
+  const [bangOpen, setBangOpen] = useState(false)
+  const [bangCreating, setBangCreating] = useState(false)
+  const [bangFields, setBangFields] = useState<BangFields>({ title: '', description: '', dueDateRaw: '', priority: 'medium' })
   const fileRef = useRef<HTMLInputElement>(null)
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPosRef = useRef<number>(-1)
+  const bangPosRef = useRef<number>(-1)
 
   // Expose addFiles to parent via ref (for drag-and-drop)
   useEffect(() => {
@@ -708,10 +930,56 @@ function MessageInput({
     })
   }
 
+  // Parse "!title !!description !!duedate !!priority" from text after bangPos
+  function parseBangInline(val: string, bangPos: number): Partial<BangFields> {
+    const raw = val.slice(bangPos + 1) // everything after the !
+    const parts = raw.split(/\s*!!\s*/)
+    const title = parts[0]?.trim() ?? ''
+    const description = parts[1]?.trim() ?? ''
+    const thirdPart = parts[2]?.trim() ?? ''
+    const fourthPart = parts[3]?.trim() ?? ''
+
+    // Detect if third part is a priority keyword or a date
+    const PRIOS = ['low', 'medium', 'high', 'urgent']
+    let dueDateRaw = thirdPart
+    let priority: Task['priority'] = 'medium'
+
+    if (PRIOS.includes(fourthPart.toLowerCase())) {
+      priority = fourthPart.toLowerCase() as Task['priority']
+    } else if (PRIOS.includes(thirdPart.toLowerCase())) {
+      // third part is actually priority, no date
+      priority = thirdPart.toLowerCase() as Task['priority']
+      dueDateRaw = ''
+    }
+
+    return { title, description, dueDateRaw, priority }
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value
     setText(val)
 
+    // ── Bang (!) handler ──────────────────────────────────────────────────────
+    if (bangOpen) {
+      const bangPos = bangPosRef.current
+      if (bangPos >= 0 && val.length > bangPos) {
+        // Live-parse inline syntax into popover fields
+        const parsed = parseBangInline(val, bangPos)
+        setBangFields(prev => ({ ...prev, ...parsed }))
+      } else {
+        closeBang()
+      }
+    } else {
+      // Detect standalone ! at start or after whitespace
+      const cursor = e.target.selectionStart ?? val.length
+      if (val[cursor - 1] === '!' && (cursor === 1 || /[\s]/.test(val[cursor - 2]))) {
+        bangPosRef.current = cursor - 1
+        setBangFields({ title: '', description: '', dueDateRaw: '', priority: 'medium' })
+        setBangOpen(true)
+      }
+    }
+
+    // ── Slash (/) task picker ──────────────────────────────────────────────────
     if (pickerOpen) {
       const slashPos = slashPosRef.current
       if (slashPos >= 0 && val.length > slashPos) {
@@ -726,7 +994,7 @@ function MessageInput({
         setPickerOpen(false)
         slashPosRef.current = -1
       }
-    } else {
+    } else if (!bangOpen) {
       const cursor = e.target.selectionStart ?? val.length
       if (val[cursor - 1] === '/' && (cursor === 1 || val[cursor - 2] === ' ' || val[cursor - 2] === '\n')) {
         slashPosRef.current = cursor - 1
@@ -741,6 +1009,11 @@ function MessageInput({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (bangOpen && e.key === 'Escape') {
+      e.preventDefault()
+      closeBang()
+      return
+    }
     if (pickerOpen && e.key === 'Escape') {
       e.preventDefault()
       closePicker()
@@ -763,6 +1036,43 @@ function MessageInput({
     e.preventDefault()
     const files = fileItems.map(i => i.getAsFile()).filter(Boolean) as File[]
     addFiles(files)
+  }
+
+  function closeBang() {
+    setBangOpen(false)
+    bangPosRef.current = -1
+    setBangFields({ title: '', description: '', dueDateRaw: '', priority: 'medium' })
+    textareaRef.current?.focus()
+  }
+
+  async function handleBangSubmit() {
+    if (!bangFields.title.trim() || bangCreating) return
+    setBangCreating(true)
+    try {
+      const parsedDate = parseNaturalDate(bangFields.dueDateRaw)
+      const created = await tasksApi.create({
+        workspaceId,
+        title: bangFields.title.trim(),
+        description: bangFields.description.trim() || undefined,
+        due_date: parsedDate,
+        priority: bangFields.priority,
+        status: 'todo',
+        assignee_ids: [],
+        labels: [],
+        position: 0,
+      })
+      // Remove the !... text from textarea
+      const bangPos = bangPosRef.current
+      if (bangPos >= 0) {
+        setText(prev => prev.slice(0, bangPos).trimEnd())
+      }
+      setLinkedTask(created)
+      closeBang()
+    } catch (err) {
+      console.error('Task create failed', err)
+    } finally {
+      setBangCreating(false)
+    }
   }
 
   function closePicker() {
@@ -835,9 +1145,18 @@ function MessageInput({
 
   return (
     <div className="shrink-0 border-t border-ios-gray-5 bg-white px-4 py-3">
-      {/* Task picker popover */}
+      {/* Popovers (task picker / task creator) */}
       <div className="relative">
-        {pickerOpen && (
+        {bangOpen && (
+          <TaskCreatePopover
+            fields={bangFields}
+            onFieldChange={f => setBangFields(prev => ({ ...prev, ...f }))}
+            onSubmit={handleBangSubmit}
+            onClose={closeBang}
+            creating={bangCreating}
+          />
+        )}
+        {pickerOpen && !bangOpen && (
           <TaskPickerPopover
             query={pickerQuery}
             tasks={allTasks}
@@ -893,7 +1212,7 @@ function MessageInput({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type / to attach a task · paste or drag & drop files'}
+          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type ! to create a task · / to attach · paste or drag & drop files'}
           rows={1}
           className="flex-1 resize-none rounded-2xl border border-ios-gray-4 bg-ios-gray-6 px-3.5 py-2 text-sm text-ios-label placeholder:text-ios-gray-3 focus:outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors leading-relaxed max-h-32 overflow-y-auto"
           style={{ minHeight: '38px' }}
