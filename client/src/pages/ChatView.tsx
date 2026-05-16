@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { Avatar } from '@/components/ui/Avatar'
 import { TaskDetail } from '@/components/tasks/TaskDetail'
+import { useLocation } from 'react-router-dom'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWs } from '@/hooks/useWs'
@@ -938,6 +939,7 @@ function MessageInput({
   currentUserName,
   allTasks,
   inputRef,
+  initialLinkedTask,
   onSent,
   onFileUploaded,
 }: {
@@ -946,13 +948,14 @@ function MessageInput({
   currentUserName: string
   allTasks: Task[]
   inputRef?: React.MutableRefObject<{ addFiles: (files: FileList | File[]) => void } | null>
+  initialLinkedTask?: Task | null
   onSent: (msg: ChatMessage) => void
   onFileUploaded: (msg: ChatMessage) => void
 }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [linkedTask, setLinkedTask] = useState<Task | null>(null)
+  const [linkedTask, setLinkedTask] = useState<Task | null>(initialLinkedTask ?? null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -1403,41 +1406,41 @@ function MessageInput({
   )
 }
 
-// ── Channel Tab Bar (horizontal) ──────────────────────────────────────────────
+// ── Workspace Tab Bar (horizontal) ────────────────────────────────────────────
 
-function ChannelTabBar({
-  channels,
+function WorkspaceTabBar({
+  workspaces,
   activeId,
   onSelect,
   onNew,
 }: {
-  channels: ChatChannel[]
+  workspaces: import('@/lib/api').Workspace[]
   activeId: string | null
-  onSelect: (ch: ChatChannel) => void
+  onSelect: (ws: import('@/lib/api').Workspace) => void
   onNew: () => void
 }) {
   return (
     <div className="shrink-0 border-b border-ios-gray-5 bg-white flex items-center overflow-x-auto scrollbar-none">
       <div className="flex items-center gap-1 px-3 py-2 min-w-0">
-        {channels.map(ch => (
+        {workspaces.map(ws => (
           <button
-            key={ch.id}
-            onClick={() => onSelect(ch)}
+            key={ws.id}
+            onClick={() => onSelect(ws)}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0',
-              activeId === ch.id
+              activeId === ws.id
                 ? 'bg-[var(--ws-color,#007AFF)] text-white'
                 : 'text-ios-secondary bg-ios-gray-6 hover:bg-ios-gray-5'
             )}
           >
-            <Hash size={11} className="shrink-0 opacity-70" />
-            {ch.name}
+            {ws.icon ? <span className="text-[11px]">{ws.icon}</span> : <Hash size={11} className="shrink-0 opacity-70" />}
+            {ws.name}
           </button>
         ))}
         <button
           onClick={onNew}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs text-ios-gray-2 bg-ios-gray-6 hover:bg-ios-gray-5 hover:text-ios-blue transition-colors shrink-0"
-          title="New Channel"
+          title="New Workspace"
         >
           <Plus size={12} />
           <span className="hidden sm:inline">New</span>
@@ -1447,19 +1450,17 @@ function ChannelTabBar({
   )
 }
 
-// ── New Channel Modal ─────────────────────────────────────────────────────────
+// ── New Workspace Modal ───────────────────────────────────────────────────────
 
-function NewChannelModal({
-  workspaceId,
+function NewWorkspaceModal({
   onClose,
   onCreated,
 }: {
-  workspaceId: string
   onClose: () => void
-  onCreated: (ch: ChatChannel) => void
+  onCreated: (ws: import('@/lib/api').Workspace) => void
 }) {
+  const { createWorkspace } = useWorkspace()
   const [name, setName] = useState('')
-  const [desc, setDesc] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -1468,26 +1469,22 @@ function NewChannelModal({
     if (!name.trim()) return setErr('Name required')
     setSaving(true)
     try {
-      const ch = await chatApi.createChannel({ workspaceId, name: name.trim(), description: desc.trim() || undefined })
-      onCreated(ch)
+      const ws = await createWorkspace(name.trim(), 'group')
+      onCreated(ws)
     } catch (e: any) {
-      setErr(e.message)
+      setErr(e.message ?? 'Failed to create workspace')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Modal open title="New Channel" onClose={onClose}>
+    <Modal open title="New Workspace" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         {err && <p className="text-sm text-ios-red bg-red-50 p-2 rounded-ios">{err}</p>}
         <div>
           <label className="block text-xs font-medium text-ios-gray-2 mb-1">Name *</label>
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. issues, prayer, general" autoFocus />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-ios-gray-2 mb-1">Description</label>
-          <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Optional" />
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Team Chat, Project Alpha" autoFocus />
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
@@ -1501,11 +1498,14 @@ function NewChannelModal({
 // ── Main ChatView ─────────────────────────────────────────────────────────────
 
 export function ChatView() {
-  const { activeWorkspace } = useWorkspace()
+  const { workspaceList, activeWorkspace, setActiveWorkspace } = useWorkspace()
   const { user: authUser } = useAuth()
   const { subscribe } = useWs()
+  const location = useLocation()
+  const navLinkedTask = (location.state as { linkedTask?: Task } | null)?.linkedTask ?? null
 
-  const [channels, setChannels] = useState<ChatChannel[]>([])
+  // The "chat workspace" is the one selected in the tab bar — starts as activeWorkspace
+  const [chatWorkspaceId, setChatWorkspaceId] = useState<string | null>(null)
   const [activeChannel, setActiveChannel] = useState<ChatChannel | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [users, setUsers] = useState<Map<string, AppUser>>(new Map())
@@ -1513,7 +1513,7 @@ export function ChatView() {
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
-  const [newChannelOpen, setNewChannelOpen] = useState(false)
+  const [newWorkspaceOpen, setNewWorkspaceOpen] = useState(false)
   const [typingLabel, setTypingLabel] = useState<string | null>(null)
   const [openTask, setOpenTask] = useState<Task | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -1523,7 +1523,15 @@ export function ChatView() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dragCounterRef = useRef(0)
   const inputRef = useRef<{ addFiles: (files: FileList | File[]) => void } | null>(null)
-  const workspaceId = activeWorkspace?.id ?? ''
+
+  // Sync chatWorkspaceId with activeWorkspace on first load
+  useEffect(() => {
+    if (!chatWorkspaceId && activeWorkspace?.id) {
+      setChatWorkspaceId(activeWorkspace.id)
+    }
+  }, [activeWorkspace?.id, chatWorkspaceId])
+
+  const workspaceId = chatWorkspaceId ?? activeWorkspace?.id ?? ''
 
   // Load users once
   useEffect(() => {
@@ -1540,12 +1548,12 @@ export function ChatView() {
     }).catch(() => {})
   }, [workspaceId])
 
-  // Load channels when workspace changes
+  // Load default channel when chat workspace changes
   useEffect(() => {
     if (!workspaceId) return
+    setActiveChannel(null)
     chatApi.channels(workspaceId).then(({ channels: list }) => {
-      setChannels(list)
-      if (list.length > 0 && !activeChannel) {
+      if (list.length > 0) {
         setActiveChannel(list[0])
       }
     }).catch(console.error)
@@ -1653,43 +1661,41 @@ export function ChatView() {
     if (files.length > 0) inputRef.current?.addFiles(files)
   }
 
-  if (!workspaceId) {
+  const currentUserId = authUser?.id ?? ''
+  const currentUserName = authUser?.user_metadata?.name ?? authUser?.email?.split('@')[0] ?? 'You'
+  const chatWorkspace = workspaceList.find(w => w.id === workspaceId) ?? activeWorkspace
+
+  if (!workspaceList.length && !activeWorkspace) {
     return (
       <div className="flex flex-col h-full">
         <TopBar title="Chat" subtitle="Real-time messaging" accentColor="var(--ws-color,#007AFF)" />
         <div className="flex-1 flex items-center justify-center text-ios-gray-3">
           <div className="text-center">
             <MessageSquare size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Select a workspace to start chatting</p>
+            <p className="text-sm">Create a workspace to start chatting</p>
           </div>
         </div>
       </div>
     )
   }
 
-  const currentUserId = authUser?.id ?? ''
-  const currentUserName = authUser?.user_metadata?.name ?? authUser?.email?.split('@')[0] ?? 'You'
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <TopBar
         title="Chat"
-        subtitle={activeChannel ? `#${activeChannel.name}` : activeWorkspace?.name ?? ''}
+        subtitle={chatWorkspace?.name ?? 'Chat'}
         accentColor="var(--ws-color,#007AFF)"
-        actions={
-          <Button size="sm" onClick={() => setNewChannelOpen(true)}>
-            <Plus size={14} className="sm:mr-1" />
-            <span className="hidden sm:inline">Channel</span>
-          </Button>
-        }
       />
 
-      {/* Channel tab bar — horizontal, full width */}
-      <ChannelTabBar
-        channels={channels}
-        activeId={activeChannel?.id ?? null}
-        onSelect={ch => setActiveChannel(ch)}
-        onNew={() => setNewChannelOpen(true)}
+      {/* Workspace tab bar — each workspace is a channel */}
+      <WorkspaceTabBar
+        workspaces={workspaceList}
+        activeId={workspaceId || null}
+        onSelect={ws => {
+          setChatWorkspaceId(ws.id)
+          setActiveWorkspace(ws)
+        }}
+        onNew={() => setNewWorkspaceOpen(true)}
       />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
@@ -1712,7 +1718,10 @@ export function ChatView() {
 
           {!activeChannel ? (
             <div className="flex-1 flex items-center justify-center text-ios-gray-3">
-              <p className="text-sm">Select a channel</p>
+              <div className="text-center">
+                <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Select a workspace above to chat</p>
+              </div>
             </div>
           ) : (
             <>
@@ -1749,8 +1758,8 @@ export function ChatView() {
 
                 {!loading && messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-20 text-ios-gray-3">
-                    <Hash size={32} className="mb-3 opacity-30" />
-                    <p className="text-sm font-medium">#{activeChannel.name}</p>
+                    <MessageSquare size={32} className="mb-3 opacity-30" />
+                    <p className="text-sm font-medium">{chatWorkspace?.name ?? 'Chat'}</p>
                     <p className="text-xs mt-1">No messages yet. Say hello!</p>
                   </div>
                 )}
@@ -1842,6 +1851,7 @@ export function ChatView() {
                 currentUserName={currentUserName}
                 allTasks={allTasks}
                 inputRef={inputRef}
+                initialLinkedTask={navLinkedTask}
                 onSent={handleMessageSent}
                 onFileUploaded={handleMessageSent}
               />
@@ -1862,14 +1872,12 @@ export function ChatView() {
         )}
       </div>
 
-      {newChannelOpen && (
-        <NewChannelModal
-          workspaceId={workspaceId}
-          onClose={() => setNewChannelOpen(false)}
-          onCreated={(ch) => {
-            setChannels(prev => [...prev, ch])
-            setActiveChannel(ch)
-            setNewChannelOpen(false)
+      {newWorkspaceOpen && (
+        <NewWorkspaceModal
+          onClose={() => setNewWorkspaceOpen(false)}
+          onCreated={(ws) => {
+            setChatWorkspaceId(ws.id)
+            setNewWorkspaceOpen(false)
           }}
         />
       )}

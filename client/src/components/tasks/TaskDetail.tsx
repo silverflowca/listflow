@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check } from 'lucide-react'
+import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check, MessageSquare } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { tasks as tasksApi, audio as audioApi, type Task, type Subtask, type Comment, type AudioRecording } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -26,6 +27,7 @@ function relativeTime(dateStr: string) {
 
 export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProps) {
   const { activeWorkspace } = useWorkspace()
+  const navigate = useNavigate()
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description ?? '')
   const [effortPoints, setEffortPoints] = useState(task.effort_points ?? '')
@@ -190,6 +192,14 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
         <div className="flex items-center justify-between px-5 py-4 border-b border-ios-gray-5 shrink-0">
           <StatusBadge status={task.status} />
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => { onClose(); navigate('/chat', { state: { linkedTask: task } }) }}
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ios border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
+              title="Send to Chat"
+            >
+              <MessageSquare size={13} />
+              Chat
+            </button>
             <button
               onClick={handleShare}
               className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ios border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"

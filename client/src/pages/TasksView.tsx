@@ -471,17 +471,10 @@ export function TasksView() {
 
   // Filters
   const [search, setSearch] = useState('')
-  const [wsFilter, setWsFilter] = useState<string[]>([])
+  const [wsFilter, setWsFilter] = useState<string[]>(() =>
+    activeWorkspace ? [activeWorkspace.id, ...activeDescendantIds] : []
+  )
   const [statusFilter, setStatusFilter] = useState<Task['status'][]>([])
-
-  // Auto-sync workspace filter when active workspace changes
-  useEffect(() => {
-    if (activeWorkspace) {
-      setWsFilter([activeWorkspace.id, ...activeDescendantIds])
-    } else {
-      setWsFilter([])
-    }
-  }, [activeWorkspace?.id, activeDescendantIds.join(',')])
   const [priorityFilter, setPriorityFilter] = useState<Task['priority'][]>([])
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -611,12 +604,9 @@ export function TasksView() {
     return list
   }, [allTasks, wsFilter, statusFilter, priorityFilter, search, dateFrom, dateTo, sortKey, sortDir])
 
-  // Tasks for board view: scoped to single workspace (active or first filter)
+  // Tasks for board view: use all filtered tasks (workspace already applied above)
   const boardWorkspaceId = wsFilter.length === 1 ? wsFilter[0] : (activeWorkspace?.id ?? '')
-  const boardTasks = useMemo(
-    () => filtered.filter(t => t.workspace_id === boardWorkspaceId),
-    [filtered, boardWorkspaceId]
-  )
+  const boardTasks = useMemo(() => filtered, [filtered])
 
   const hasFilters = wsFilter.length > 0 || statusFilter.length > 0 || priorityFilter.length > 0 || search || dateFrom || dateTo
 
