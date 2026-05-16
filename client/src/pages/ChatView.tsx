@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, CheckSquare, X, MessageSquare } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { Avatar } from '@/components/ui/Avatar'
+import { TaskDetail } from '@/components/tasks/TaskDetail'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWs } from '@/hooks/useWs'
-import { chat as chatApi, users as usersApi, type ChatChannel, type ChatMessage, type AppUser } from '@/lib/api'
+import { chat as chatApi, tasks as tasksApi, users as usersApi, type ChatChannel, type ChatMessage, type AppUser, type Task } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,6 +34,345 @@ function sameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString()
 }
 
+// ── Task Detail Panel (embedded, non-modal) ───────────────────────────────────
+
+function TaskDetailPanel({ task, onClose, onUpdate, onDelete }: {
+  task: Task
+  onClose: () => void
+  onUpdate: (t: Task) => void
+  onDelete: () => void
+}) {
+  const { activeWorkspace } = useWorkspace()
+  const [title, setTitle] = useState(task.title)
+  const [description, setDescription] = useState(task.description ?? '')
+  const [effortPoints, setEffortPoints] = useState(task.effort_points ?? '')
+  const [subtasks, setSubtasks] = useState(task.subtasks ?? [])
+  const [comments, setComments] = useState(task.comments ?? [])
+  const [newSubtask, setNewSubtask] = useState('')
+  const [newComment, setNewComment] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [addingComment, setAddingComment] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Reset state when task changes
+  useEffect(() => {
+    setTitle(task.title)
+    setDescription(task.description ?? '')
+    setEffortPoints(task.effort_points ?? '')
+    setSubtasks(task.subtasks ?? [])
+    setComments(task.comments ?? [])
+  }, [task.id])
+
+  const STATUSES: Task['status'][] = ['todo', 'in_progress', 'review', 'done', 'cancelled']
+  const PRIORITIES: Task['priority'][] = ['low', 'medium', 'high', 'urgent']
+
+  const STATUS_BADGE: Record<Task['status'], string> = {
+    todo: 'bg-ios-gray-5 text-ios-gray-2',
+    in_progress: 'ws-bg ws-text',
+    review: 'bg-yellow-100 text-yellow-700',
+    done: 'bg-green-100 text-green-700',
+    cancelled: 'bg-red-100 text-ios-red',
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const updated = await tasksApi.update(task.id, { title, description, effort_points: effortPoints || undefined })
+      onUpdate(updated)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const changeStatus = async (status: Task['status']) => {
+    const updated = await tasksApi.update(task.id, { status })
+    onUpdate(updated)
+  }
+
+  const changePriority = async (priority: Task['priority']) => {
+    const updated = await tasksApi.update(task.id, { priority })
+    onUpdate(updated)
+  }
+
+  const addSubtask = async () => {
+    if (!newSubtask.trim()) return
+    const sub = await tasksApi.subtasks.create(task.id, { title: newSubtask })
+    setSubtasks(prev => [...prev, sub])
+    setNewSubtask('')
+  }
+
+  const toggleSubtask = async (sub: import('@/lib/api').Subtask) => {
+    const updated = await tasksApi.subtasks.update(task.id, sub.id, { completed: !sub.completed })
+    setSubtasks(prev => prev.map(s => s.id === sub.id ? updated : s))
+  }
+
+  const deleteSubtask = async (subId: string) => {
+    await tasksApi.subtasks.delete(task.id, subId)
+    setSubtasks(prev => prev.filter(s => s.id !== subId))
+  }
+
+  const addComment = async () => {
+    if (!newComment.trim()) return
+    setAddingComment(true)
+    try {
+      const comment = await tasksApi.comments.create(task.id, { content: newComment })
+      setComments(prev => [...prev, comment])
+      setNewComment('')
+    } finally {
+      setAddingComment(false)
+    }
+  }
+
+  const deleteComment = async (cid: string) => {
+    await tasksApi.comments.delete(task.id, cid)
+    setComments(prev => prev.filter(c => c.id !== cid))
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-ios-gray-5 bg-white">
+        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full capitalize', STATUS_BADGE[task.status] ?? STATUS_BADGE.todo)}>
+          {task.status.replace('_', ' ')}
+        </span>
+        <button onClick={onClose} className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-ios transition-colors">
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Title */}
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onBlur={save}
+          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          className="w-full text-base font-semibold text-ios-label outline-none bg-transparent rounded-lg px-2 py-1 -mx-2 hover:bg-ios-gray-6 focus:bg-ios-gray-6 transition-colors"
+          placeholder="Task title"
+        />
+
+        {/* Status + Priority */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-xs text-ios-gray-1 mb-1">Status</p>
+            <select
+              value={task.status}
+              onChange={e => changeStatus(e.target.value as Task['status'])}
+              className="w-full text-xs rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 text-ios-label outline-none"
+            >
+              {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs text-ios-gray-1 mb-1">Priority</p>
+            <select
+              value={task.priority}
+              onChange={e => changePriority(e.target.value as Task['priority'])}
+              className="w-full text-xs rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 text-ios-label outline-none"
+            >
+              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Effort */}
+        <div>
+          <p className="text-xs text-ios-gray-1 mb-1">Effort</p>
+          <input
+            value={effortPoints}
+            onChange={e => setEffortPoints(e.target.value)}
+            onBlur={save}
+            placeholder="3h, 2 days, 5 pts…"
+            className="w-full text-xs rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 text-ios-label outline-none"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <p className="text-xs text-ios-gray-1 mb-1">Description</p>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            onBlur={save}
+            rows={3}
+            className="w-full text-sm text-ios-label rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 outline-none resize-none"
+            placeholder="Add a description…"
+          />
+        </div>
+
+        {/* Subtasks */}
+        <div>
+          <p className="text-xs font-medium text-ios-gray-1 mb-2">
+            Subtasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})
+          </p>
+          <div className="space-y-1">
+            {subtasks.map(sub => (
+              <div key={sub.id} className="flex items-center gap-2 group">
+                <input
+                  type="checkbox"
+                  checked={sub.completed}
+                  onChange={() => toggleSubtask(sub)}
+                  className="rounded ws-accent"
+                />
+                <span className={cn('text-sm flex-1', sub.completed && 'line-through text-ios-gray-2')}>
+                  {sub.title}
+                </span>
+                <button
+                  onClick={() => deleteSubtask(sub.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-ios-red transition-opacity"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <input
+              value={newSubtask}
+              onChange={e => setNewSubtask(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addSubtask()}
+              className="flex-1 text-xs rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 outline-none"
+              placeholder="Add subtask…"
+            />
+            <button onClick={addSubtask} className="p-2 ws-btn-primary rounded-ios transition-colors">
+              <Plus size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Comments */}
+        <div>
+          <p className="text-xs font-medium text-ios-gray-1 mb-2">
+            Comments {comments.length > 0 && `(${comments.length})`}
+          </p>
+          {comments.length === 0 ? (
+            <p className="text-xs text-ios-gray-3 mb-2">No comments yet.</p>
+          ) : (
+            <div className="space-y-2 mb-2">
+              {comments.map(c => (
+                <div key={c.id} className="bg-ios-gray-6 rounded-ios border border-ios-gray-5/60 p-2.5 group relative">
+                  <p className="text-xs text-ios-label pr-5 leading-relaxed">{c.content}</p>
+                  <p className="text-[11px] text-ios-gray-3 mt-1">
+                    {new Date(c.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <button
+                    onClick={() => deleteComment(c.id)}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-0.5 text-ios-red transition-opacity"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addComment()}
+              className="flex-1 text-xs rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 outline-none"
+              placeholder="Add comment…"
+            />
+            <button
+              onClick={addComment}
+              disabled={addingComment}
+              className="p-2 ws-btn-primary rounded-ios disabled:opacity-50 transition-colors"
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer — delete */}
+      <div className="shrink-0 px-4 py-3 border-t border-ios-gray-5 flex justify-end">
+        <button
+          onClick={() => { if (confirm('Delete this task?')) onDelete() }}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-ios bg-red-50 border border-red-200 text-ios-red hover:bg-red-100 transition-colors"
+        >
+          <X size={12} /> Delete task
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Inline Task Card ──────────────────────────────────────────────────────────
+
+const STATUS_COLOR: Record<Task['status'], string> = {
+  todo:        'bg-ios-gray-4 text-ios-gray-1',
+  in_progress: 'bg-blue-100 text-ios-blue',
+  review:      'bg-yellow-100 text-yellow-700',
+  done:        'bg-green-100 text-ios-green',
+  cancelled:   'bg-red-100 text-ios-red',
+}
+const STATUS_LABEL: Record<Task['status'], string> = {
+  todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done', cancelled: 'Cancelled',
+}
+const PRIORITY_COLOR: Record<Task['priority'], string> = {
+  urgent: 'text-ios-red',
+  high:   'text-ios-orange',
+  medium: 'text-ios-blue',
+  low:    'text-ios-gray-3',
+}
+
+function InlineTaskCard({ taskId, onOpen }: { taskId: string; onOpen: (task: Task) => void }) {
+  const [task, setTask] = useState<Task | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    tasksApi.get(taskId)
+      .then(setTask)
+      .catch(() => setTask(null))
+      .finally(() => setLoading(false))
+  }, [taskId])
+
+  if (loading) {
+    return (
+      <div className="mt-2 flex items-center gap-2 text-xs text-ios-gray-3 bg-ios-gray-6 rounded-xl px-3 py-2">
+        <Spinner size="sm" />
+        <span>Loading task…</span>
+      </div>
+    )
+  }
+
+  if (!task) return null
+
+  return (
+    <button
+      onClick={() => onOpen(task)}
+      className="mt-2 w-full text-left bg-white border border-ios-gray-4 rounded-xl px-3 py-2.5 hover:border-[var(--ws-color,#007AFF)] hover:shadow-sm transition-all group"
+    >
+      <div className="flex items-start gap-2">
+        <Circle
+          size={13}
+          className={cn('shrink-0 mt-0.5', PRIORITY_COLOR[task.priority])}
+          fill="currentColor"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-ios-label leading-snug line-clamp-2">{task.title}</p>
+          {task.description && (
+            <p className="text-xs text-ios-gray-2 mt-0.5 line-clamp-1">{task.description}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={cn('text-[11px] font-medium px-1.5 py-0.5 rounded-md', STATUS_COLOR[task.status])}>
+              {STATUS_LABEL[task.status]}
+            </span>
+            <span className="text-[11px] text-ios-gray-3 capitalize">{task.priority}</span>
+            {task.due_date && (
+              <span className="text-[11px] text-ios-gray-3">
+                Due {new Date(task.due_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              </span>
+            )}
+          </div>
+        </div>
+        <ExternalLink size={13} className="shrink-0 text-ios-gray-3 group-hover:text-[var(--ws-color,#007AFF)] transition-colors mt-0.5" />
+      </div>
+    </button>
+  )
+}
+
 // ── Message Bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -42,6 +382,7 @@ function MessageBubble({
   workspaceId,
   channelId,
   onPinned,
+  onOpenTask,
 }: {
   msg: ChatMessage
   isOwn: boolean
@@ -49,19 +390,20 @@ function MessageBubble({
   workspaceId: string
   channelId: string
   onPinned: (msg: ChatMessage, taskId: string) => void
+  onOpenTask: (task: Task) => void
 }) {
   const [pinning, setPinning] = useState(false)
-  const [pinned, setPinned] = useState(!!msg.task_id)
+  const [taskId, setTaskId] = useState<string | null>(msg.task_id ?? null)
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'Unknown'
   const isImage = msg.file_type?.startsWith('image/')
 
   async function handlePin() {
-    if (pinned || pinning) return
+    if (taskId || pinning) return
     setPinning(true)
     try {
       const result = await chatApi.pinAsTask(channelId, msg.id, workspaceId)
-      setPinned(true)
+      setTaskId(result.task.id)
       onPinned(msg, result.task.id)
     } catch (e) {
       console.error('Pin failed', e)
@@ -128,20 +470,13 @@ function MessageBubble({
             </a>
           )}
 
-          {/* Task badge if pinned */}
-          {pinned && (
-            <div className={cn(
-              'mt-1.5 flex items-center gap-1 text-[11px]',
-              isOwn ? 'text-white/70' : 'text-ios-green'
-            )}>
-              <CheckSquare size={11} />
-              <span>Task created</span>
-            </div>
-          )}
         </div>
 
-        {/* Pin button — shown on hover */}
-        {!pinned && (
+        {/* Inline task card — shown below bubble when task exists */}
+        {taskId && <InlineTaskCard taskId={taskId} onOpen={onOpenTask} />}
+
+        {/* Pin button — shown on hover when no task yet */}
+        {!taskId && (
           <button
             onClick={handlePin}
             disabled={pinning}
@@ -392,6 +727,7 @@ export function ChatView() {
   const [hasMore, setHasMore] = useState(false)
   const [newChannelOpen, setNewChannelOpen] = useState(false)
   const [typingLabel, setTypingLabel] = useState<string | null>(null)
+  const [openTask, setOpenTask] = useState<Task | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -533,7 +869,7 @@ export function ChatView() {
         />
 
         {/* Main chat area */}
-        <div className="flex flex-col flex-1 overflow-hidden bg-ios-gray-6/20">
+        <div className={cn('flex flex-col overflow-hidden bg-ios-gray-6/20', openTask ? 'flex-1' : 'flex-1')}>
           {!activeChannel ? (
             <div className="flex-1 flex items-center justify-center text-ios-gray-3">
               <p className="text-sm">Select a channel</p>
@@ -603,6 +939,7 @@ export function ChatView() {
                         workspaceId={workspaceId}
                         channelId={activeChannel.id}
                         onPinned={handlePinned}
+                        onOpenTask={setOpenTask}
                       />
                     </React.Fragment>
                   )
@@ -633,6 +970,18 @@ export function ChatView() {
             </>
           )}
         </div>
+
+        {/* Task detail panel — slides in on right when a task card is clicked */}
+        {openTask && (
+          <div className="w-[420px] shrink-0 border-l border-ios-gray-5 bg-white flex flex-col overflow-hidden">
+            <TaskDetailPanel
+              task={openTask}
+              onClose={() => setOpenTask(null)}
+              onUpdate={(updated) => setOpenTask(updated)}
+              onDelete={() => setOpenTask(null)}
+            />
+          </div>
+        )}
       </div>
 
       {newChannelOpen && (
