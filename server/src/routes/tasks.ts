@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { lf } from '../db/client.js'
 import { requireAuth } from '../middleware/auth.js'
-import { emitTaskCreated, emitTaskUpdated } from '../lib/ws.js'
+import { emitTaskCreated, emitTaskUpdated, emitTaskNotification } from '../lib/ws.js'
 
 const r = new Hono()
 
@@ -82,8 +82,9 @@ r.post('/', requireAuth, async (c) => {
 
 // PATCH /api/tasks/:id
 r.patch('/:id', requireAuth, async (c) => {
+  const user = c.get('user')
   const body = await c.req.json() as Record<string, unknown>
-  const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id', 'effort_points']
+  const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'notify_user_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id', 'effort_points']
   const updates: Record<string, unknown> = {}
   for (const k of allowed) if (body[k] !== undefined) updates[k] = body[k]
 
@@ -95,6 +96,11 @@ r.patch('/:id', requireAuth, async (c) => {
 
   if (error) return c.json({ error: error.message }, 500)
   emitTaskUpdated(data as Record<string, unknown>)
+  // Notify watchers (if task has notify_user_ids and it wasn't just a watcher-list change)
+  const notifyIds: string[] = Array.isArray(data.notify_user_ids) ? data.notify_user_ids : []
+  if (notifyIds.length > 0 && !('notify_user_ids' in updates && Object.keys(updates).length === 1)) {
+    emitTaskNotification(data as Record<string, unknown>, user.id)
+  }
   return c.json(data)
 })
 

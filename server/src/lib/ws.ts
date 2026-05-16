@@ -5,12 +5,15 @@ export type LfWsEventType =
   | 'connected'
   | 'task.created'
   | 'task.updated'
+  | 'task.notification'
   | 'agent.thinking'
   | 'agent.tool_called'
   | 'agent.done'
   | 'agent.failed'
   | 'transcript.ready'
   | 'chat.message'
+  | 'chat.message.updated'
+  | 'chat.message.deleted'
   | 'chat.typing'
   | 'ping'
 
@@ -61,6 +64,9 @@ export const emitTaskCreated = (task: Record<string, unknown>) =>
 export const emitTaskUpdated = (task: Record<string, unknown>) =>
   emit('task.updated', { task })
 
+export const emitTaskNotification = (task: Record<string, unknown>, updatedBy: string) =>
+  emit('task.notification', { task, updatedBy })
+
 export const emitAgentThinking = (runId: string, iteration: number, thought: string) =>
   emit('agent.thinking', { runId, iteration, thought })
 
@@ -78,6 +84,12 @@ export const emitTranscriptReady = (recordingId: string, transcriptId: string, r
 
 export const emitChatMessage = (msg: Record<string, unknown>) =>
   emit('chat.message', { message: msg })
+
+export const emitChatMessageUpdated = (msg: Record<string, unknown>) =>
+  emit('chat.message.updated', { message: msg })
+
+export const emitChatMessageDeleted = (messageId: string, channelId: string, scope: string, userId: string) =>
+  emit('chat.message.deleted', { messageId, channelId, scope, userId })
 
 export const emitChatTyping = (channelId: string, userId: string, name: string) =>
   emit('chat.typing', { channelId, userId, name })

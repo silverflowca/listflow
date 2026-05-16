@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check, MessageSquare } from 'lucide-react'
+import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check, MessageSquare, Bell, BellOff, User, UserPlus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { tasks as tasksApi, audio as audioApi, type Task, type Subtask, type Comment, type AudioRecording } from '@/lib/api'
+import { tasks as tasksApi, users as usersApi, audio as audioApi, type Task, type Subtask, type Comment, type AudioRecording, type AppUser } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface TaskDetailProps {
   task: Task
@@ -27,6 +28,7 @@ function relativeTime(dateStr: string) {
 
 export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProps) {
   const { activeWorkspace } = useWorkspace()
+  const { user: authUser } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description ?? '')
@@ -42,8 +44,57 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
   const [recording, setRecording] = useState(false)
   const [audioError, setAudioError] = useState('')
   const [expandedTranscripts, setExpandedTranscripts] = useState<Record<string, boolean>>({})
-
   const [copied, setCopied] = useState(false)
+
+  // Assignees + notify
+  const [allUsers, setAllUsers] = useState<AppUser[]>([])
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(task.assignee_ids ?? [])
+  const [notifyIds, setNotifyIds] = useState<string[]>(task.notify_user_ids ?? [])
+  const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false)
+  const assigneeMenuRef = useRef<HTMLDivElement>(null)
+
+  // Load users once
+  useEffect(() => {
+    usersApi.list().then(({ users }) => setAllUsers(users)).catch(() => {})
+  }, [])
+
+  // Sync from task prop when task changes
+  useEffect(() => {
+    setAssigneeIds(task.assignee_ids ?? [])
+    setNotifyIds(task.notify_user_ids ?? [])
+  }, [task.id])
+
+  // Close assignee menu on outside click
+  useEffect(() => {
+    if (!assigneeMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(e.target as Node)) setAssigneeMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [assigneeMenuOpen])
+
+  const toggleAssignee = async (userId: string) => {
+    const next = assigneeIds.includes(userId)
+      ? assigneeIds.filter(id => id !== userId)
+      : [...assigneeIds, userId]
+    setAssigneeIds(next)
+    const updated = await tasksApi.update(task.id, { assignee_ids: next })
+    onUpdate(updated)
+  }
+
+  const toggleNotify = async (userId: string) => {
+    const next = notifyIds.includes(userId)
+      ? notifyIds.filter(id => id !== userId)
+      : [...notifyIds, userId]
+    setNotifyIds(next)
+    const updated = await tasksApi.update(task.id, { notify_user_ids: next })
+    onUpdate(updated)
+  }
+
+  // "Notify me" quick toggle for current user
+  const iAmNotified = authUser ? notifyIds.includes(authUser.id) : false
+  const toggleMyNotify = () => authUser && toggleNotify(authUser.id)
 
   const handleShare = () => {
     navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`)
@@ -193,6 +244,19 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
           <StatusBadge status={task.status} />
           <div className="flex items-center gap-1.5">
             <button
+              onClick={toggleMyNotify}
+              className={cn(
+                'flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ios border transition-colors',
+                iAmNotified
+                  ? 'border-[var(--ws-color)] bg-[var(--ws-color-light)] text-[var(--ws-color)]'
+                  : 'border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6'
+              )}
+              title={iAmNotified ? 'Stop notifications' : 'Notify me on updates'}
+            >
+              {iAmNotified ? <Bell size={13} /> : <BellOff size={13} />}
+              {iAmNotified ? 'Watching' : 'Watch'}
+            </button>
+            <button
               onClick={() => { onClose(); navigate('/chat', { state: { linkedTask: task } }) }}
               className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-ios border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
               title="Send to Chat"
@@ -258,6 +322,98 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
                 className="w-full text-sm rounded-ios border border-ios-gray-4 px-2 py-1.5 bg-ios-gray-6 text-ios-label outline-none ws-focus"
               />
             </div>
+          </div>
+
+          {/* Assignees */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-ios-gray-1">Assigned to</p>
+              <div className="relative" ref={assigneeMenuRef}>
+                <button
+                  onClick={() => setAssigneeMenuOpen(v => !v)}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-ios-gray-4 text-ios-gray-1 hover:bg-ios-gray-6 transition-colors"
+                >
+                  <UserPlus size={11} />
+                  Assign
+                </button>
+                {assigneeMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-ios-gray-5 rounded-xl shadow-lg py-1 z-50 min-w-44 max-h-52 overflow-y-auto">
+                    {allUsers.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-ios-gray-3">No users found</p>
+                    )}
+                    {allUsers.map(u => {
+                      const isAssigned = assigneeIds.includes(u.id)
+                      const isNotified = notifyIds.includes(u.id)
+                      return (
+                        <div key={u.id} className="flex items-center gap-2 px-3 py-2 hover:bg-ios-gray-6">
+                          {/* Avatar circle */}
+                          <span
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
+                            style={{ backgroundColor: u.color || 'var(--ws-color, #007AFF)' }}
+                          >
+                            {u.initials || u.name?.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span className="flex-1 text-xs text-ios-label truncate">{u.name || u.email}</span>
+                          {/* Assign toggle */}
+                          <button
+                            onClick={() => toggleAssignee(u.id)}
+                            className={cn(
+                              'text-[10px] px-1.5 py-0.5 rounded-md border transition-colors',
+                              isAssigned
+                                ? 'border-[var(--ws-color)] bg-[var(--ws-color-light)] text-[var(--ws-color)]'
+                                : 'border-ios-gray-4 text-ios-gray-3 hover:border-ios-gray-3'
+                            )}
+                          >
+                            {isAssigned ? 'Assigned' : 'Assign'}
+                          </button>
+                          {/* Notify toggle */}
+                          <button
+                            onClick={() => toggleNotify(u.id)}
+                            className={cn(
+                              'p-0.5 rounded transition-colors',
+                              isNotified ? 'text-[var(--ws-color)]' : 'text-ios-gray-4 hover:text-ios-gray-2'
+                            )}
+                            title={isNotified ? 'Remove notification' : 'Notify on updates'}
+                          >
+                            {isNotified ? <Bell size={12} /> : <BellOff size={12} />}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Assigned avatars row */}
+            {assigneeIds.length === 0 ? (
+              <p className="text-xs text-ios-gray-4 italic">No one assigned</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {assigneeIds.map(id => {
+                  const u = allUsers.find(u => u.id === id)
+                  if (!u) return null
+                  const isNotified = notifyIds.includes(u.id)
+                  return (
+                    <div key={id} className="flex items-center gap-1 bg-ios-gray-6 border border-ios-gray-5 rounded-full pl-0.5 pr-2 py-0.5">
+                      <span
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-semibold shrink-0"
+                        style={{ backgroundColor: u.color || 'var(--ws-color, #007AFF)' }}
+                      >
+                        {u.initials || u.name?.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="text-xs text-ios-label">{u.name || u.email}</span>
+                      {isNotified && <Bell size={10} className="text-[var(--ws-color)]" />}
+                      <button
+                        onClick={() => toggleAssignee(id)}
+                        className="text-ios-gray-4 hover:text-ios-red transition-colors ml-0.5"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Description */}

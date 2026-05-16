@@ -52,7 +52,8 @@ export interface Task {
   id: string; workspace_id: string; database_id?: string; title: string; description?: string
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
-  assignee_ids: string[]; parent_task_id?: string; due_date?: string; labels: string[]
+  assignee_ids: string[]; notify_user_ids: string[]
+  parent_task_id?: string; due_date?: string; labels: string[]
   effort_points?: string
   created_by: string; position: number; created_at: string; updated_at: string
   subtasks?: Subtask[]; comments?: Comment[]
@@ -247,6 +248,7 @@ export interface ChatMessage {
   id: string; channel_id: string; workspace_id: string; user_id: string
   body: string; file_url?: string; file_name?: string; file_type?: string
   task_id?: string; created_at: string; updated_at: string
+  deleted_at?: string; deleted_for?: string[]
 }
 
 export interface ModelOption { id: string; label: string; group: string }
@@ -307,6 +309,10 @@ export const chat = {
   },
   pinAsTask: (channelId: string, messageId: string, workspaceId: string) =>
     post<{ task: Task; message: ChatMessage }>(`/api/chat/channels/${channelId}/pin-task`, { messageId, workspaceId }),
+  editMessage: (channelId: string, messageId: string, body: string) =>
+    req<ChatMessage>('PATCH', `/api/chat/channels/${channelId}/messages/${messageId}`, { body }),
+  deleteMessage: (channelId: string, messageId: string, scope: 'self' | 'everyone') =>
+    req<{ ok: boolean }>('DELETE', `/api/chat/channels/${channelId}/messages/${messageId}?scope=${scope}`, undefined),
   typing: (channelId: string, name?: string) =>
     post<{ ok: boolean }>('/api/chat/typing', { channelId, name }),
 }

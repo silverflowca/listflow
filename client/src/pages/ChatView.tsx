@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File as FileIcon, UploadCloud, CheckSquare, CalendarDays, AlertCircle, Mic, Camera } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File as FileIcon, UploadCloud, CheckSquare, CalendarDays, AlertCircle, Mic, Camera, Pencil, Trash2, Share2, Check } from 'lucide-react'
 import { AudioRecorderClient, formatDuration } from '@/lib/audio'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
@@ -447,29 +447,60 @@ function ImageGrid({ urls, isOwn }: { urls: { url: string; name: string }[]; isO
 // ── Message Bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({
-  msg,
+  msg: initialMsg,
   isOwn,
   user,
+  currentUserId,
   workspaceId,
   channelId,
   groupedImages,
   onPinned,
   onOpenTask,
+  onUpdated,
+  onDeleted,
 }: {
   msg: ChatMessage
   isOwn: boolean
   user: AppUser | undefined
+  currentUserId: string
   workspaceId: string
   channelId: string
   groupedImages?: { url: string; name: string }[]
   onPinned: (msg: ChatMessage, taskId: string) => void
   onOpenTask: (task: Task) => void
+  onUpdated: (msg: ChatMessage) => void
+  onDeleted: (msgId: string, scope: 'self' | 'everyone', userId: string) => void
 }) {
+  const [msg, setMsg] = useState(initialMsg)
   const [pinning, setPinning] = useState(false)
-  const [taskId, setTaskId] = useState<string | null>(msg.task_id ?? null)
+  const [taskId, setTaskId] = useState<string | null>(initialMsg.task_id ?? null)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(initialMsg.body)
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [deleteMenu, setDeleteMenu] = useState(false)
+  const deleteMenuRef = useRef<HTMLDivElement>(null)
+
+  // Sync msg from parent (WS updates)
+  useEffect(() => { setMsg(initialMsg) }, [initialMsg.id, initialMsg.body, initialMsg.deleted_at, initialMsg.updated_at])
+
+  // Close delete menu on outside click
+  useEffect(() => {
+    if (!deleteMenu) return
+    const handler = (e: MouseEvent) => {
+      if (deleteMenuRef.current && !deleteMenuRef.current.contains(e.target as Node)) setDeleteMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [deleteMenu])
 
   const displayName = user?.name || user?.email?.split('@')[0] || 'Unknown'
   const isImage = msg.file_type?.startsWith('image/')
+
+  // Soft-deleted check: deleted_at = deleted for everyone; deleted_for includes currentUserId = hidden for me
+  const deletedForEveryone = !!msg.deleted_at
+  const deletedForMe = !deletedForEveryone && (msg.deleted_for ?? []).includes(currentUserId)
+  const isHidden = deletedForEveryone || deletedForMe
 
   async function handlePin() {
     if (taskId || pinning) return
@@ -485,15 +516,63 @@ function MessageBubble({
     }
   }
 
+  async function handleEditSave() {
+    if (!editText.trim() || saving) return
+    setSaving(true)
+    try {
+      const updated = await chatApi.editMessage(channelId, msg.id, editText)
+      setMsg(updated)
+      setEditing(false)
+      onUpdated(updated)
+    } catch (e) {
+      console.error('Edit failed', e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(scope: 'self' | 'everyone') {
+    setDeleteMenu(false)
+    try {
+      await chatApi.deleteMessage(channelId, msg.id, scope)
+      onDeleted(msg.id, scope, currentUserId)
+    } catch (e) {
+      console.error('Delete failed', e)
+    }
+  }
+
+  function handleShare() {
+    const text = msg.body || msg.file_name || 'Chat message'
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  if (isHidden) {
+    return (
+      <div className={cn('flex gap-2.5', isOwn ? 'flex-row-reverse' : 'flex-row')}>
+        <div className="shrink-0 mt-0.5 opacity-40">
+          <Avatar name={user?.name || user?.email || '?'} src={user?.avatar_url} size="sm" />
+        </div>
+        <div className={cn('flex flex-col max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}>
+          <div className={cn('flex items-baseline gap-1.5 mb-1', isOwn ? 'flex-row-reverse' : 'flex-row')}>
+            <span className="text-xs font-semibold text-ios-gray-3">{isOwn ? 'You' : displayName}</span>
+            <span className="text-[11px] text-ios-gray-4">{formatTime(msg.created_at)}</span>
+          </div>
+          <div className="px-3.5 py-2 rounded-2xl text-xs text-ios-gray-3 italic border border-ios-gray-5 bg-ios-gray-6">
+            {deletedForEveryone ? 'This message was deleted' : 'You deleted this message'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={cn('flex gap-2.5 group', isOwn ? 'flex-row-reverse' : 'flex-row')}>
       {/* Avatar */}
       <div className="shrink-0 mt-0.5">
-        <Avatar
-          name={user?.name || user?.email || '?'}
-          src={user?.avatar_url}
-          size="sm"
-        />
+        <Avatar name={user?.name || user?.email || '?'} src={user?.avatar_url} size="sm" />
       </div>
 
       {/* Bubble content */}
@@ -504,6 +583,9 @@ function MessageBubble({
             {isOwn ? 'You' : displayName}
           </span>
           <span className="text-[11px] text-ios-gray-3">{formatTime(msg.created_at)}</span>
+          {msg.updated_at !== msg.created_at && !msg.deleted_at && (
+            <span className="text-[10px] text-ios-gray-4 italic">edited</span>
+          )}
         </div>
 
         {/* Bubble */}
@@ -513,82 +595,163 @@ function MessageBubble({
             ? 'rounded-tr-sm bg-[var(--ws-color,#007AFF)] text-white'
             : 'rounded-tl-sm bg-white border border-ios-gray-5 text-ios-label shadow-sm'
         )}>
-          {/* Text body */}
-          {msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
-
-          {/* Image attachment — use grid if grouped, else single */}
-          {isImage && msg.file_url && (
-            groupedImages
-              ? <ImageGrid urls={groupedImages} isOwn={isOwn} />
-              : (
-                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
-                  <img
-                    src={msg.file_url}
-                    alt={msg.file_name || 'attachment'}
-                    className="max-w-xs max-h-48 rounded-xl object-cover cursor-zoom-in"
-                  />
-                </a>
-              )
-          )}
-
-          {/* Audio attachment */}
-          {msg.file_type?.startsWith('audio/') && msg.file_url && (
-            <div className={cn('mt-2 rounded-xl overflow-hidden', isOwn ? 'bg-white/20' : 'bg-ios-gray-6 border border-ios-gray-4')}>
-              <audio
-                controls
-                src={msg.file_url}
-                className="w-full max-w-xs"
-                style={{ height: 36 }}
+          {/* Inline edit mode */}
+          {editing ? (
+            <div className="flex flex-col gap-2 min-w-[180px]">
+              <textarea
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave() }
+                  if (e.key === 'Escape') setEditing(false)
+                }}
+                autoFocus
+                rows={2}
+                className={cn(
+                  'w-full resize-none rounded-lg px-2 py-1 text-sm outline-none',
+                  isOwn ? 'bg-white/20 text-white placeholder:text-white/60' : 'bg-ios-gray-6 text-ios-label border border-ios-gray-4'
+                )}
               />
+              <div className="flex gap-1.5 justify-end">
+                <button onClick={() => setEditing(false)} className={cn('text-xs px-2 py-0.5 rounded-lg', isOwn ? 'bg-white/20 text-white' : 'bg-ios-gray-5 text-ios-gray-2')}>
+                  Cancel
+                </button>
+                <button onClick={handleEditSave} disabled={saving} className={cn('text-xs px-2 py-0.5 rounded-lg', isOwn ? 'bg-white text-[var(--ws-color,#007AFF)]' : 'bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40')}>
+                  {saving ? '…' : 'Save'}
+                </button>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Text body */}
+              {msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
 
-          {/* Non-image file — rich thumbnail card */}
-          {!isImage && !msg.file_type?.startsWith('audio/') && msg.file_url && (
-            <a
-              href={msg.file_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(
-                'flex items-center gap-3 mt-2 px-3 py-2.5 rounded-xl transition-colors',
-                isOwn
-                  ? 'bg-white/20 hover:bg-white/30'
-                  : 'bg-ios-gray-6 hover:bg-ios-gray-5 border border-ios-gray-4'
+              {/* Image attachment — use grid if grouped, else single */}
+              {isImage && msg.file_url && (
+                groupedImages
+                  ? <ImageGrid urls={groupedImages} isOwn={isOwn} />
+                  : (
+                    <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                      <img
+                        src={msg.file_url}
+                        alt={msg.file_name || 'attachment'}
+                        className="max-w-xs max-h-48 rounded-xl object-cover cursor-zoom-in"
+                      />
+                    </a>
+                  )
               )}
-            >
-              <div className={cn('shrink-0 w-9 h-9 rounded-lg flex items-center justify-center', isOwn ? 'bg-white/30' : 'bg-white border border-ios-gray-5')}>
-                {fileIcon(msg.file_type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={cn('text-xs font-medium truncate', isOwn ? 'text-white' : 'text-ios-label')}>
-                  {msg.file_name || 'attachment'}
-                </p>
-                <p className={cn('text-[11px]', isOwn ? 'text-white/70' : 'text-ios-gray-2')}>
-                  {fileLabel(msg.file_type)} · tap to open
-                </p>
-              </div>
-              <ExternalLink size={13} className={cn('shrink-0', isOwn ? 'text-white/60' : 'text-ios-gray-3')} />
-            </a>
-          )}
 
+              {/* Audio attachment */}
+              {msg.file_type?.startsWith('audio/') && msg.file_url && (
+                <div className={cn('mt-2 rounded-xl overflow-hidden', isOwn ? 'bg-white/20' : 'bg-ios-gray-6 border border-ios-gray-4')}>
+                  <audio controls src={msg.file_url} className="w-full max-w-xs" style={{ height: 36 }} />
+                </div>
+              )}
+
+              {/* Non-image file — rich thumbnail card */}
+              {!isImage && !msg.file_type?.startsWith('audio/') && msg.file_url && (
+                <a
+                  href={msg.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    'flex items-center gap-3 mt-2 px-3 py-2.5 rounded-xl transition-colors',
+                    isOwn ? 'bg-white/20 hover:bg-white/30' : 'bg-ios-gray-6 hover:bg-ios-gray-5 border border-ios-gray-4'
+                  )}
+                >
+                  <div className={cn('shrink-0 w-9 h-9 rounded-lg flex items-center justify-center', isOwn ? 'bg-white/30' : 'bg-white border border-ios-gray-5')}>
+                    {fileIcon(msg.file_type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn('text-xs font-medium truncate', isOwn ? 'text-white' : 'text-ios-label')}>{msg.file_name || 'attachment'}</p>
+                    <p className={cn('text-[11px]', isOwn ? 'text-white/70' : 'text-ios-gray-2')}>{fileLabel(msg.file_type)} · tap to open</p>
+                  </div>
+                  <ExternalLink size={13} className={cn('shrink-0', isOwn ? 'text-white/60' : 'text-ios-gray-3')} />
+                </a>
+              )}
+            </>
+          )}
         </div>
 
         {/* Inline task card — shown below bubble when task exists */}
         {taskId && <InlineTaskCard taskId={taskId} onOpen={onOpenTask} />}
 
-        {/* Pin button — shown on hover when no task yet */}
-        {!taskId && (
-          <button
-            onClick={handlePin}
-            disabled={pinning}
-            className={cn(
-              'mt-1 flex items-center gap-1 text-[11px] text-ios-gray-3 hover:text-ios-blue transition-colors opacity-0 group-hover:opacity-100',
-              pinning && 'opacity-50 cursor-wait'
+        {/* Hover action row */}
+        {!editing && (
+          <div className={cn(
+            'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity',
+            isOwn ? 'flex-row-reverse' : 'flex-row'
+          )}>
+            {/* Pin as task */}
+            {!taskId && (
+              <button
+                onClick={handlePin}
+                disabled={pinning}
+                className="flex items-center gap-1 text-[11px] text-ios-gray-3 hover:text-ios-blue px-1.5 py-0.5 rounded-lg hover:bg-ios-gray-5 transition-colors disabled:opacity-40"
+                title="Pin as task"
+              >
+                <Pin size={11} />
+                {pinning ? '…' : 'Task'}
+              </button>
             )}
-          >
-            <Pin size={11} />
-            {pinning ? 'Creating task...' : 'Pin as task'}
-          </button>
+
+            {/* Edit (own text messages only) */}
+            {isOwn && msg.body && !msg.file_url && (
+              <button
+                onClick={() => { setEditText(msg.body); setEditing(true) }}
+                className="flex items-center gap-1 text-[11px] text-ios-gray-3 hover:text-ios-blue px-1.5 py-0.5 rounded-lg hover:bg-ios-gray-5 transition-colors"
+                title="Edit message"
+              >
+                <Pencil size={11} />
+                Edit
+              </button>
+            )}
+
+            {/* Share (copy text) */}
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 text-[11px] text-ios-gray-3 hover:text-ios-blue px-1.5 py-0.5 rounded-lg hover:bg-ios-gray-5 transition-colors"
+              title="Copy message text"
+            >
+              {copied ? <Check size={11} className="text-ios-green" /> : <Share2 size={11} />}
+              {copied ? 'Copied' : 'Share'}
+            </button>
+
+            {/* Delete */}
+            <div className="relative" ref={deleteMenuRef}>
+              <button
+                onClick={() => setDeleteMenu(v => !v)}
+                className="flex items-center gap-1 text-[11px] text-ios-gray-3 hover:text-ios-red px-1.5 py-0.5 rounded-lg hover:bg-red-50 transition-colors"
+                title="Delete message"
+              >
+                <Trash2 size={11} />
+                Delete
+              </button>
+              {deleteMenu && (
+                <div className={cn(
+                  'absolute bottom-full mb-1 bg-white border border-ios-gray-5 rounded-xl shadow-lg py-1 z-50 min-w-40',
+                  isOwn ? 'right-0' : 'left-0'
+                )}>
+                  <button
+                    onClick={() => handleDelete('self')}
+                    className="w-full text-left px-3 py-2 text-xs text-ios-label hover:bg-ios-gray-6 flex items-center gap-2"
+                  >
+                    <Trash2 size={12} className="text-ios-gray-2" />
+                    Delete for me
+                  </button>
+                  {isOwn && (
+                    <button
+                      onClick={() => handleDelete('everyone')}
+                      className="w-full text-left px-3 py-2 text-xs text-ios-red hover:bg-red-50 flex items-center gap-2"
+                    >
+                      <Trash2 size={12} />
+                      Delete for everyone
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -1577,7 +1740,6 @@ export function ChatView() {
       const msg = e.payload.message as ChatMessage
       if (msg.channel_id === activeChannel?.id) {
         setMessages(prev => {
-          // Deduplicate (optimistic sends)
           if (prev.some(m => m.id === msg.id)) return prev
           return [...prev, msg]
         })
@@ -1586,6 +1748,40 @@ export function ChatView() {
     })
     return unsub
   }, [activeChannel?.id, subscribe])
+
+  // WebSocket: message edited
+  useEffect(() => {
+    const unsub = subscribe('chat.message.updated', (e) => {
+      const msg = e.payload.message as ChatMessage
+      if (msg.channel_id === activeChannel?.id) {
+        setMessages(prev => prev.map(m => m.id === msg.id ? msg : m))
+      }
+    })
+    return unsub
+  }, [activeChannel?.id, subscribe])
+
+  // WebSocket: message deleted
+  useEffect(() => {
+    const unsub = subscribe('chat.message.deleted', (e) => {
+      const { messageId, channelId: evtChannelId, scope, userId } = e.payload as { messageId: string; channelId: string; scope: string; userId: string }
+      if (evtChannelId !== activeChannel?.id) return
+      if (scope === 'everyone') {
+        setMessages(prev => prev.map(m => m.id === messageId
+          ? { ...m, body: '', file_url: undefined, file_name: undefined, file_type: undefined, deleted_at: new Date().toISOString() }
+          : m
+        ))
+      } else {
+        // scope=self — only hide for the user who deleted it
+        if (userId === currentUserId) {
+          setMessages(prev => prev.map(m => m.id === messageId
+            ? { ...m, deleted_for: [...(m.deleted_for ?? []), userId] }
+            : m
+          ))
+        }
+      }
+    })
+    return unsub
+  }, [activeChannel?.id, currentUserId, subscribe])
 
   // WebSocket: typing indicator
   useEffect(() => {
@@ -1634,6 +1830,19 @@ export function ChatView() {
 
   function handlePinned(original: ChatMessage, taskId: string) {
     setMessages(prev => prev.map(m => m.id === original.id ? { ...m, task_id: taskId } : m))
+  }
+
+  function handleMessageUpdated(updated: ChatMessage) {
+    setMessages(prev => prev.map(m => m.id === updated.id ? updated : m))
+  }
+
+  function handleMessageDeleted(msgId: string, scope: 'self' | 'everyone', userId: string) {
+    if (scope === 'everyone') {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, body: '', file_url: undefined, file_name: undefined, file_type: undefined, deleted_at: new Date().toISOString() } : m))
+    } else {
+      // scope=self: add currentUserId to deleted_for
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, deleted_for: [...(m.deleted_for ?? []), userId] } : m))
+    }
   }
 
   function handleDragEnter(e: React.DragEvent) {
@@ -1818,11 +2027,14 @@ export function ChatView() {
                           msg={msg}
                           isOwn={isOwn}
                           user={user}
+                          currentUserId={currentUserId}
                           workspaceId={workspaceId}
                           channelId={activeChannel.id}
                           groupedImages={groupedImages}
                           onPinned={handlePinned}
                           onOpenTask={setOpenTask}
+                          onUpdated={handleMessageUpdated}
+                          onDeleted={handleMessageDeleted}
                         />
                       </React.Fragment>
                     )

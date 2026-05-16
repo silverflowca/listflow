@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { lf, supabase } from '../db/client.js'
 import { requireAuth } from '../middleware/auth.js'
-import { emitChatMessage, emitChatTyping, emitTaskCreated } from '../lib/ws.js'
+import { emitChatMessage, emitChatMessageUpdated, emitChatMessageDeleted, emitChatTyping, emitTaskCreated } from '../lib/ws.js'
 import { randomUUID } from 'crypto'
 
 const r = new Hono()
@@ -171,6 +171,76 @@ r.post('/channels/:id/upload', requireAuth, async (c) => {
 
   emitChatMessage(msg as Record<string, unknown>)
   return c.json(msg, 201)
+})
+
+// ── PATCH /api/chat/channels/:id/messages/:msgId ────────────────────────────
+// Edit a message body (own messages only)
+
+r.patch('/channels/:id/messages/:msgId', requireAuth, async (c) => {
+  const user = c.get('user')
+  const msgId = c.req.param('msgId')
+  const body = await c.req.json() as { body: string }
+
+  if (!body.body?.trim()) return c.json({ error: 'body required' }, 400)
+
+  // Fetch existing message and verify ownership
+  const { data: existing, error: fetchErr } = await (lf('chat_messages') as any)
+    .select('*')
+    .eq('id', msgId)
+    .single()
+
+  if (fetchErr || !existing) return c.json({ error: 'Message not found' }, 404)
+  if (existing.user_id !== user.id) return c.json({ error: 'Not your message' }, 403)
+
+  const { data: updated, error } = await (lf('chat_messages') as any)
+    .update({ body: body.body.trim(), updated_at: new Date().toISOString() })
+    .eq('id', msgId)
+    .select()
+    .single()
+
+  if (error) return c.json({ error: error.message }, 500)
+
+  emitChatMessageUpdated(updated as Record<string, unknown>)
+  return c.json(updated)
+})
+
+// ── DELETE /api/chat/channels/:id/messages/:msgId?scope=self|everyone ────────
+// Delete a message. scope=self → soft-delete for current user only (sets deleted_for_user_id).
+//                   scope=everyone → marks body as deleted for all (own messages only).
+
+r.delete('/channels/:id/messages/:msgId', requireAuth, async (c) => {
+  const user = c.get('user')
+  const msgId = c.req.param('msgId')
+  const scope = (c.req.query('scope') ?? 'self') as 'self' | 'everyone'
+  const channelId = c.req.param('id')
+
+  const { data: existing, error: fetchErr } = await (lf('chat_messages') as any)
+    .select('*')
+    .eq('id', msgId)
+    .single()
+
+  if (fetchErr || !existing) return c.json({ error: 'Message not found' }, 404)
+
+  if (scope === 'everyone') {
+    // Only own messages can be deleted for everyone
+    if (existing.user_id !== user.id) return c.json({ error: 'Not your message' }, 403)
+    const { error } = await (lf('chat_messages') as any)
+      .update({ body: '', file_url: null, file_name: null, file_type: null, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', msgId)
+    if (error) return c.json({ error: error.message }, 500)
+  } else {
+    // scope=self: store user id in deleted_for array
+    const deletedFor: string[] = Array.isArray(existing.deleted_for) ? existing.deleted_for : []
+    if (!deletedFor.includes(user.id)) {
+      const { error } = await (lf('chat_messages') as any)
+        .update({ deleted_for: [...deletedFor, user.id], updated_at: new Date().toISOString() })
+        .eq('id', msgId)
+      if (error) return c.json({ error: error.message }, 500)
+    }
+  }
+
+  emitChatMessageDeleted(msgId, channelId, scope, user.id)
+  return c.json({ ok: true })
 })
 
 // ── POST /api/chat/channels/:id/pin-task ────────────────────────────────────
