@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud, CheckSquare, CalendarDays, AlertCircle, Mic, Camera } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File as FileIcon, UploadCloud, CheckSquare, CalendarDays, AlertCircle, Mic, Camera } from 'lucide-react'
 import { AudioRecorderClient, formatDuration } from '@/lib/audio'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
@@ -17,13 +17,13 @@ import { cn } from '@/lib/utils'
 // ── File helpers ──────────────────────────────────────────────────────────────
 
 function fileIcon(fileType?: string) {
-  if (!fileType) return <File size={20} className="text-ios-gray-2" />
+  if (!fileType) return <FileIcon size={20} className="text-ios-gray-2" />
   if (fileType.includes('pdf')) return <FileText size={20} className="text-ios-red" />
   if (fileType.includes('sheet') || fileType.includes('excel') || fileType.includes('csv'))
     return <FileSpreadsheet size={20} className="text-ios-green" />
   if (fileType.includes('word') || fileType.includes('document'))
     return <FileText size={20} className="text-ios-blue" />
-  return <File size={20} className="text-ios-gray-2" />
+  return <FileIcon size={20} className="text-ios-gray-2" />
 }
 
 function fileLabel(fileType?: string): string {
