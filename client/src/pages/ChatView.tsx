@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud, CheckSquare, CalendarDays, AlertCircle } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud, CheckSquare, CalendarDays, AlertCircle, Mic, Camera } from 'lucide-react'
+import { AudioRecorderClient, formatDuration } from '@/lib/audio'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -394,6 +395,54 @@ function InlineTaskCard({ taskId, onOpen }: { taskId: string; onOpen: (task: Tas
   )
 }
 
+// ── Image Grid (WhatsApp-style 2×2 with N+ overflow) ─────────────────────────
+
+function ImageGrid({ urls, isOwn }: { urls: { url: string; name: string }[]; isOwn: boolean }) {
+  const visible = urls.slice(0, 4)
+  const overflow = urls.length - 4
+
+  if (urls.length === 1) {
+    return (
+      <a href={urls[0].url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+        <img
+          src={urls[0].url}
+          alt={urls[0].name}
+          className="max-w-xs max-h-56 rounded-xl object-cover cursor-zoom-in"
+        />
+      </a>
+    )
+  }
+
+  return (
+    <div className={cn('mt-1 grid gap-0.5 rounded-xl overflow-hidden', urls.length === 2 ? 'grid-cols-2' : 'grid-cols-2')}>
+      {visible.map((img, i) => {
+        const isLast = i === 3 && overflow > 0
+        return (
+          <a
+            key={i}
+            href={img.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative block aspect-square overflow-hidden"
+          >
+            <img
+              src={img.url}
+              alt={img.name}
+              className="w-full h-full object-cover"
+              style={{ maxWidth: 130, maxHeight: 130 }}
+            />
+            {isLast && (
+              <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
+                <span className="text-white text-lg font-bold">+{overflow}</span>
+              </div>
+            )}
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Message Bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -402,6 +451,7 @@ function MessageBubble({
   user,
   workspaceId,
   channelId,
+  groupedImages,
   onPinned,
   onOpenTask,
 }: {
@@ -410,6 +460,7 @@ function MessageBubble({
   user: AppUser | undefined
   workspaceId: string
   channelId: string
+  groupedImages?: { url: string; name: string }[]
   onPinned: (msg: ChatMessage, taskId: string) => void
   onOpenTask: (task: Task) => void
 }) {
@@ -464,19 +515,35 @@ function MessageBubble({
           {/* Text body */}
           {msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
 
-          {/* Image attachment */}
+          {/* Image attachment — use grid if grouped, else single */}
           {isImage && msg.file_url && (
-            <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
-              <img
+            groupedImages
+              ? <ImageGrid urls={groupedImages} isOwn={isOwn} />
+              : (
+                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                  <img
+                    src={msg.file_url}
+                    alt={msg.file_name || 'attachment'}
+                    className="max-w-xs max-h-48 rounded-xl object-cover cursor-zoom-in"
+                  />
+                </a>
+              )
+          )}
+
+          {/* Audio attachment */}
+          {msg.file_type?.startsWith('audio/') && msg.file_url && (
+            <div className={cn('mt-2 rounded-xl overflow-hidden', isOwn ? 'bg-white/20' : 'bg-ios-gray-6 border border-ios-gray-4')}>
+              <audio
+                controls
                 src={msg.file_url}
-                alt={msg.file_name || 'attachment'}
-                className="max-w-xs max-h-48 rounded-xl object-cover cursor-zoom-in"
+                className="w-full max-w-xs"
+                style={{ height: 36 }}
               />
-            </a>
+            </div>
           )}
 
           {/* Non-image file — rich thumbnail card */}
-          {!isImage && msg.file_url && (
+          {!isImage && !msg.file_type?.startsWith('audio/') && msg.file_url && (
             <a
               href={msg.file_url}
               target="_blank"
@@ -893,7 +960,13 @@ function MessageInput({
   const [bangOpen, setBangOpen] = useState(false)
   const [bangCreating, setBangCreating] = useState(false)
   const [bangFields, setBangFields] = useState<BangFields>({ title: '', description: '', dueDateRaw: '', priority: 'medium' })
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingMs, setRecordingMs] = useState(0)
+  const audioRecorderRef = useRef<AudioRecorderClient | null>(null)
+
   const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const slashPosRef = useRef<number>(-1)
@@ -904,9 +977,14 @@ function MessageInput({
     if (inputRef) inputRef.current = { addFiles }
   })
 
-  // Cleanup object URLs on unmount
+  // Cleanup object URLs and recording on unmount
   useEffect(() => {
-    return () => pendingFiles.forEach(pf => pf.previewUrl && URL.revokeObjectURL(pf.previewUrl))
+    return () => {
+      pendingFiles.forEach(pf => pf.previewUrl && URL.revokeObjectURL(pf.previewUrl))
+      if (audioRecorderRef.current?.isRecording) {
+        audioRecorderRef.current.stop().catch(() => {})
+      }
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const emitTyping = useCallback(() => {
@@ -1140,6 +1218,46 @@ function MessageInput({
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  function handleCameraInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (files?.length) addFiles(files)
+    if (cameraRef.current) cameraRef.current.value = ''
+  }
+
+  async function toggleRecording() {
+    if (isRecording) {
+      // Stop and upload
+      try {
+        const result = await audioRecorderRef.current!.stop()
+        setIsRecording(false)
+        setRecordingMs(0)
+        if (result.blob.size > 0) {
+          setUploading(true)
+          try {
+            const file = new File([result.blob], `voice-${Date.now()}.${result.mimeType.includes('mp4') ? 'm4a' : 'webm'}`, { type: result.mimeType })
+            const msg = await chatApi.upload(channelId, file)
+            onFileUploaded(msg)
+          } finally {
+            setUploading(false)
+          }
+        }
+      } catch {
+        setIsRecording(false)
+        setRecordingMs(0)
+      }
+    } else {
+      // Start recording
+      try {
+        audioRecorderRef.current = new AudioRecorderClient()
+        await audioRecorderRef.current.start((ms) => setRecordingMs(ms))
+        setIsRecording(true)
+        setRecordingMs(0)
+      } catch {
+        setIsRecording(false)
+      }
+    }
+  }
+
   const canSend = !!(text.trim() || linkedTask || pendingFiles.length > 0)
   const isBusy = sending || uploading
 
@@ -1186,12 +1304,21 @@ function MessageInput({
         </div>
       )}
 
+      {/* Recording indicator bar */}
+      {isRecording && (
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <span className="w-2 h-2 rounded-full bg-ios-red animate-pulse" />
+          <span className="text-xs font-mono font-medium text-ios-red">{formatDuration(recordingMs)}</span>
+          <span className="text-xs text-ios-gray-2">Recording… tap mic to send</span>
+        </div>
+      )}
+
       <div className="flex items-end gap-2">
         {/* File attachment button */}
         <button
           onClick={() => fileRef.current?.click()}
-          disabled={isBusy}
-          className="shrink-0 p-2 rounded-xl text-ios-gray-2 hover:text-ios-blue hover:bg-ios-gray-6 transition-colors"
+          disabled={isBusy || isRecording}
+          className="shrink-0 p-2 rounded-xl text-ios-gray-2 hover:text-ios-blue hover:bg-ios-gray-6 transition-colors disabled:opacity-40"
           title="Attach file (or drag & drop / paste)"
         >
           {uploading ? <Spinner size="sm" /> : <Paperclip size={18} />}
@@ -1205,28 +1332,72 @@ function MessageInput({
           onChange={handleFileInput}
         />
 
-        {/* Text area */}
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type ! to create a task · / to attach · paste or drag & drop files'}
-          rows={1}
-          className="flex-1 resize-none rounded-2xl border border-ios-gray-4 bg-ios-gray-6 px-3.5 py-2 text-sm text-ios-label placeholder:text-ios-gray-3 focus:outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors leading-relaxed max-h-32 overflow-y-auto"
-          style={{ minHeight: '38px' }}
+        {/* Camera button (mobile native camera capture) */}
+        <button
+          onClick={() => cameraRef.current?.click()}
+          disabled={isBusy || isRecording}
+          className="shrink-0 p-2 rounded-xl text-ios-gray-2 hover:text-ios-blue hover:bg-ios-gray-6 transition-colors disabled:opacity-40"
+          title="Take photo or choose from library"
+        >
+          <Camera size={18} />
+        </button>
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleCameraInput}
         />
 
-        {/* Send button */}
-        <button
-          onClick={handleSend}
-          disabled={!canSend || isBusy}
-          className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
-          title="Send"
-        >
-          {isBusy ? <Spinner size="sm" /> : <Send size={16} />}
-        </button>
+        {/* Text area (hidden while recording) */}
+        {isRecording ? (
+          <div className="flex-1 rounded-2xl border border-ios-red/40 bg-red-50 px-3.5 py-2 text-sm text-ios-red italic" style={{ minHeight: '38px' }}>
+            🎙 Recording voice message…
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={linkedTask ? 'Add a message (optional)…' : 'Type ! to create a task · / to attach · paste or drag & drop files'}
+            rows={1}
+            className="flex-1 resize-none rounded-2xl border border-ios-gray-4 bg-ios-gray-6 px-3.5 py-2 text-sm text-ios-label placeholder:text-ios-gray-3 focus:outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors leading-relaxed max-h-32 overflow-y-auto"
+            style={{ minHeight: '38px' }}
+          />
+        )}
+
+        {/* Send / Mic button — mic when idle+empty, send when has content, red mic when recording */}
+        {isRecording ? (
+          <button
+            onClick={toggleRecording}
+            disabled={uploading}
+            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-ios-red text-white animate-pulse disabled:opacity-40 transition-all"
+            title="Stop and send voice message"
+          >
+            <Mic size={16} />
+          </button>
+        ) : canSend ? (
+          <button
+            onClick={handleSend}
+            disabled={isBusy}
+            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
+            title="Send"
+          >
+            {isBusy ? <Spinner size="sm" /> : <Send size={16} />}
+          </button>
+        ) : (
+          <button
+            onClick={toggleRecording}
+            disabled={isBusy}
+            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-ios-gray-5 text-ios-gray-2 hover:bg-ios-gray-4 disabled:opacity-40 transition-all"
+            title="Record voice message"
+          >
+            <Mic size={16} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1584,35 +1755,70 @@ export function ChatView() {
                   </div>
                 )}
 
-                {/* Messages with date separators */}
-                {messages.map((msg, i) => {
-                  const showDate = i === 0 || !sameDay(messages[i - 1].created_at, msg.created_at)
-                  const isOwn = msg.user_id === currentUserId
-                  const user = users.get(msg.user_id)
+                {/* Messages with date separators + WhatsApp image grouping */}
+                {(() => {
+                  // Build groups: consecutive image-only messages from same sender within 5 min
+                  type MsgGroup = { lead: ChatMessage; extras: ChatMessage[] }
+                  const groups: MsgGroup[] = []
+                  const skipped = new Set<string>()
 
-                  return (
-                    <React.Fragment key={msg.id}>
-                      {showDate && (
-                        <div className="flex items-center gap-3 py-2">
-                          <div className="flex-1 h-px bg-ios-gray-5" />
-                          <span className="text-xs text-ios-gray-3 font-medium shrink-0">
-                            {formatDateLabel(msg.created_at)}
-                          </span>
-                          <div className="flex-1 h-px bg-ios-gray-5" />
-                        </div>
-                      )}
-                      <MessageBubble
-                        msg={msg}
-                        isOwn={isOwn}
-                        user={user}
-                        workspaceId={workspaceId}
-                        channelId={activeChannel.id}
-                        onPinned={handlePinned}
-                        onOpenTask={setOpenTask}
-                      />
-                    </React.Fragment>
-                  )
-                })}
+                  for (let i = 0; i < messages.length; i++) {
+                    if (skipped.has(messages[i].id)) continue
+                    const msg = messages[i]
+                    const isImageMsg = (m: ChatMessage) => !!m.file_type?.startsWith('image/') && !!m.file_url && !m.body
+                    if (isImageMsg(msg)) {
+                      const extras: ChatMessage[] = []
+                      let j = i + 1
+                      while (j < messages.length) {
+                        const next = messages[j]
+                        const sameUser = next.user_id === msg.user_id
+                        const closeInTime = Math.abs(new Date(next.created_at).getTime() - new Date(msg.created_at).getTime()) < 5 * 60 * 1000
+                        if (sameUser && closeInTime && isImageMsg(next)) {
+                          extras.push(next)
+                          skipped.add(next.id)
+                          j++
+                        } else break
+                      }
+                      groups.push({ lead: msg, extras })
+                    } else {
+                      groups.push({ lead: msg, extras: [] })
+                    }
+                  }
+
+                  return groups.map(({ lead: msg, extras }, gi) => {
+                    const prevMsg = gi > 0 ? groups[gi - 1].lead : null
+                    const showDate = !prevMsg || !sameDay(prevMsg.created_at, msg.created_at)
+                    const isOwn = msg.user_id === currentUserId
+                    const user = users.get(msg.user_id)
+                    const groupedImages = extras.length > 0
+                      ? [{ url: msg.file_url!, name: msg.file_name || 'photo' }, ...extras.map(e => ({ url: e.file_url!, name: e.file_name || 'photo' }))]
+                      : undefined
+
+                    return (
+                      <React.Fragment key={msg.id}>
+                        {showDate && (
+                          <div className="flex items-center gap-3 py-2">
+                            <div className="flex-1 h-px bg-ios-gray-5" />
+                            <span className="text-xs text-ios-gray-3 font-medium shrink-0">
+                              {formatDateLabel(msg.created_at)}
+                            </span>
+                            <div className="flex-1 h-px bg-ios-gray-5" />
+                          </div>
+                        )}
+                        <MessageBubble
+                          msg={msg}
+                          isOwn={isOwn}
+                          user={user}
+                          workspaceId={workspaceId}
+                          channelId={activeChannel.id}
+                          groupedImages={groupedImages}
+                          onPinned={handlePinned}
+                          onOpenTask={setOpenTask}
+                        />
+                      </React.Fragment>
+                    )
+                  })
+                })()}
 
                 {/* Typing indicator */}
                 {typingLabel && (
