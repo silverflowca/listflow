@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Mic, Trash2, Clock, Play, Pause, ChevronDown, ChevronUp } from 'lucide-react'
+import { Mic, Trash2, Clock, Play, Pause, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { AudioRecorder } from '@/components/audio/AudioRecorder'
@@ -171,16 +172,31 @@ export function AudioView() {
 
   if (!activeWorkspace) return <div className="p-6 text-ios-gray-1 text-sm">Select a workspace</div>
 
+  const recorderRef = useRef<HTMLDivElement>(null)
+
+  function scrollToRecorder() {
+    recorderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Audio & AI" />
+      <TopBar
+        title="Audio & AI"
+        actions={
+          <Button size="sm" onClick={scrollToRecorder}>
+            <Plus size={14} /> New Recording
+          </Button>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Recorder */}
-        <Card className="p-8">
-          <h2 className="text-sm font-semibold text-ios-label mb-6 text-center">Voice Recording</h2>
-          <AudioRecorder onTranscriptReady={handleTranscriptReady} />
-        </Card>
+        <div ref={recorderRef}>
+          <Card className="p-8">
+            <h2 className="text-sm font-semibold text-ios-label mb-6 text-center">Voice Recording</h2>
+            <AudioRecorder onTranscriptReady={handleTranscriptReady} />
+          </Card>
+        </div>
 
         {/* Latest transcript + agent panel */}
         {activeTranscript && (

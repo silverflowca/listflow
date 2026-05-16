@@ -1,6 +1,9 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { useWs } from '@/hooks/useWs'
 import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { Avatar } from '@/components/ui/Avatar'
 import { Wifi, WifiOff } from 'lucide-react'
 
 interface TopBarProps {
@@ -14,7 +17,10 @@ interface TopBarProps {
 export function TopBar({ title, subtitle, accentColor, actions }: TopBarProps) {
   const { connected } = useWs()
   const { activeWorkspace } = useWorkspace()
+  const { user } = useAuth()
   const palette = workspacePalette(activeWorkspace)
+
+  const displayName = user?.user_metadata?.name ?? user?.email?.split('@')[0] ?? ''
 
   return (
     <header
@@ -50,10 +56,28 @@ export function TopBar({ title, subtitle, accentColor, actions }: TopBarProps) {
       {/* Right */}
       <div className="flex items-center gap-3 shrink-0">
         {actions}
+
+        {/* WS status */}
         <div className={`flex items-center gap-1 text-xs ${connected ? 'text-ios-green' : 'text-ios-gray-2'}`}>
           {connected ? <Wifi size={12} /> : <WifiOff size={12} />}
           <span className="hidden sm:block">{connected ? 'Live' : 'Offline'}</span>
         </div>
+
+        {/* User avatar chip — links to settings */}
+        {user && (
+          <Link
+            to="/settings"
+            className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full bg-white/70 border border-ios-gray-5 hover:bg-white hover:shadow-sm transition-all"
+            title="Account settings"
+          >
+            <Avatar name={user.email ?? '?'} size="sm" />
+            {displayName && (
+              <span className="text-xs font-medium text-ios-label hidden sm:block max-w-[100px] truncate">
+                {displayName}
+              </span>
+            )}
+          </Link>
+        )}
       </div>
     </header>
   )
