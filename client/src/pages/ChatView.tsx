@@ -76,15 +76,17 @@ function TaskDetailPanel({ task, onClose, onUpdate, onDelete }: {
   const [saving, setSaving] = useState(false)
   const [addingComment, setAddingComment] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Prevent save() from re-opening the panel after X is clicked
+  const closingRef = useRef(false)
 
-  // Reset state when task changes
+  // Reset local state when a different task is opened OR when the task is updated externally
   useEffect(() => {
     setTitle(task.title)
     setDescription(task.description ?? '')
     setEffortPoints(task.effort_points ?? '')
     setSubtasks(task.subtasks ?? [])
     setComments(task.comments ?? [])
-  }, [task.id])
+  }, [task.id, task.updated_at])
 
   const STATUSES: Task['status'][] = ['todo', 'in_progress', 'review', 'done', 'cancelled']
   const PRIORITIES: Task['priority'][] = ['low', 'medium', 'high', 'urgent']
@@ -98,10 +100,11 @@ function TaskDetailPanel({ task, onClose, onUpdate, onDelete }: {
   }
 
   const save = async () => {
+    if (closingRef.current) return
     setSaving(true)
     try {
       const updated = await tasksApi.update(task.id, { title, description, effort_points: effortPoints || undefined })
-      onUpdate(updated)
+      if (!closingRef.current) onUpdate(updated)
     } finally {
       setSaving(false)
     }
@@ -109,12 +112,12 @@ function TaskDetailPanel({ task, onClose, onUpdate, onDelete }: {
 
   const changeStatus = async (status: Task['status']) => {
     const updated = await tasksApi.update(task.id, { status })
-    onUpdate(updated)
+    if (!closingRef.current) onUpdate(updated)
   }
 
   const changePriority = async (priority: Task['priority']) => {
     const updated = await tasksApi.update(task.id, { priority })
-    onUpdate(updated)
+    if (!closingRef.current) onUpdate(updated)
   }
 
   const addSubtask = async () => {
@@ -158,7 +161,7 @@ function TaskDetailPanel({ task, onClose, onUpdate, onDelete }: {
         <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full capitalize', STATUS_BADGE[task.status] ?? STATUS_BADGE.todo)}>
           {task.status.replace('_', ' ')}
         </span>
-        <button onClick={onClose} className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-ios transition-colors">
+        <button onClick={() => { closingRef.current = true; onClose() }} className="p-1.5 text-ios-gray-2 hover:bg-ios-gray-6 rounded-ios transition-colors">
           <X size={16} />
         </button>
       </div>
