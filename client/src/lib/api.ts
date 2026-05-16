@@ -288,8 +288,8 @@ export const chat = {
     post<ChatChannel>('/api/chat/channels', b),
   messages: (channelId: string, before?: string) =>
     get<{ messages: ChatMessage[] }>(`/api/chat/channels/${channelId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`),
-  send: (channelId: string, body: string) =>
-    post<ChatMessage>(`/api/chat/channels/${channelId}/messages`, { body }),
+  send: (channelId: string, body: string, taskId?: string) =>
+    post<ChatMessage>(`/api/chat/channels/${channelId}/messages`, { body, task_id: taskId ?? null }),
   upload: async (channelId: string, file: File): Promise<ChatMessage> => {
     const { data: { session } } = await supabase.auth.getSession()
     const fd = new FormData()

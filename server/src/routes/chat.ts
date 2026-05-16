@@ -90,7 +90,7 @@ r.get('/channels/:id/messages', requireAuth, async (c) => {
 r.post('/channels/:id/messages', requireAuth, async (c) => {
   const user = c.get('user')
   const channelId = c.req.param('id')
-  const body = await c.req.json() as { body: string }
+  const body = await c.req.json() as { body: string; task_id?: string | null }
 
   if (!body.body?.trim()) return c.json({ error: 'body required' }, 400)
 
@@ -108,6 +108,7 @@ r.post('/channels/:id/messages', requireAuth, async (c) => {
       workspace_id: channel.workspace_id,
       user_id: user.id,
       body: body.body.trim(),
+      task_id: body.task_id ?? null,
     })
     .select()
     .single()

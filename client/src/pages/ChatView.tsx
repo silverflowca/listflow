@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -494,31 +494,153 @@ function MessageBubble({
   )
 }
 
+// ── Task Picker Popover ───────────────────────────────────────────────────────
+
+function TaskPickerPopover({
+  query,
+  tasks,
+  onSelect,
+  onClose,
+}: {
+  query: string
+  tasks: Task[]
+  onSelect: (task: Task) => void
+  onClose: () => void
+}) {
+  const filtered = tasks.filter(t =>
+    t.title.toLowerCase().includes(query.toLowerCase()) ||
+    (t.description ?? '').toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 8)
+
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-2 mx-4 bg-white border border-ios-gray-4 rounded-2xl shadow-lg overflow-hidden z-50">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-ios-gray-5 bg-ios-gray-6/50">
+        <Search size={13} className="text-ios-gray-2 shrink-0" />
+        <span className="text-xs text-ios-gray-2">
+          {query ? `Tasks matching "${query}"` : 'Search tasks…'}
+        </span>
+        <button
+          onMouseDown={e => { e.preventDefault(); onClose() }}
+          className="ml-auto text-ios-gray-3 hover:text-ios-gray-1 transition-colors p-0.5"
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="px-3 py-4 text-center text-xs text-ios-gray-3">
+          {query ? 'No tasks found' : 'Type to search tasks'}
+        </div>
+      ) : (
+        <div className="max-h-64 overflow-y-auto divide-y divide-ios-gray-5/60">
+          {filtered.map(task => (
+            <button
+              key={task.id}
+              onMouseDown={e => { e.preventDefault(); onSelect(task) }}
+              className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-ios-gray-6 transition-colors text-left group"
+            >
+              <Circle
+                size={10}
+                className={cn('shrink-0 mt-1', PRIORITY_COLOR[task.priority])}
+                fill="currentColor"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ios-label leading-snug line-clamp-1">{task.title}</p>
+                {task.description && (
+                  <p className="text-xs text-ios-gray-3 mt-0.5 line-clamp-1">{task.description}</p>
+                )}
+              </div>
+              <span className={cn('shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded-md mt-0.5', STATUS_COLOR[task.status])}>
+                {STATUS_LABEL[task.status]}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="px-3 py-1.5 border-t border-ios-gray-5 bg-ios-gray-6/40">
+        <p className="text-[11px] text-ios-gray-3">Type to filter · Click to attach · Esc to dismiss</p>
+      </div>
+    </div>
+  )
+}
+
 // ── Message Input ─────────────────────────────────────────────────────────────
 
 function MessageInput({
   channelId,
+  workspaceId,
   currentUserName,
+  allTasks,
   onSent,
   onFileUploaded,
 }: {
   channelId: string
+  workspaceId: string
   currentUserName: string
+  allTasks: Task[]
   onSent: (msg: ChatMessage) => void
   onFileUploaded: (msg: ChatMessage) => void
 }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [linkedTask, setLinkedTask] = useState<Task | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const slashPosRef = useRef<number>(-1) // where '/' was typed
 
   const emitTyping = useCallback(() => {
     chatApi.typing(channelId, currentUserName).catch(() => {})
   }, [channelId, currentUserName])
 
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value
+    setText(val)
+
+    // Detect '/' at start of word or when picker is already open
+    if (pickerOpen) {
+      // Update query: everything after the slash
+      const slashPos = slashPosRef.current
+      if (slashPos >= 0 && val.length > slashPos) {
+        const afterSlash = val.slice(slashPos + 1)
+        // Close if space (word boundary) or backspaced past slash
+        if (afterSlash.includes(' ')) {
+          setPickerOpen(false)
+          slashPosRef.current = -1
+        } else {
+          setPickerQuery(afterSlash)
+        }
+      } else {
+        setPickerOpen(false)
+        slashPosRef.current = -1
+      }
+    } else {
+      // Check if last char typed is '/' with nothing or space before it
+      const cursor = e.target.selectionStart ?? val.length
+      if (val[cursor - 1] === '/' && (cursor === 1 || val[cursor - 2] === ' ' || val[cursor - 2] === '\n')) {
+        slashPosRef.current = cursor - 1
+        setPickerQuery('')
+        setPickerOpen(true)
+      }
+    }
+
+    // Auto-resize
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 128) + 'px'
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (pickerOpen && e.key === 'Escape') {
+      e.preventDefault()
+      closePicker()
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -529,17 +651,45 @@ function MessageInput({
     typingTimeout.current = setTimeout(emitTyping, 400)
   }
 
+  function closePicker() {
+    setPickerOpen(false)
+    slashPosRef.current = -1
+    setPickerQuery('')
+    textareaRef.current?.focus()
+  }
+
+  function handleTaskSelect(task: Task) {
+    // Remove the '/query' portion from text, replace with a clean mention tag
+    const slashPos = slashPosRef.current
+    if (slashPos >= 0) {
+      const before = text.slice(0, slashPos)
+      const after = text.slice(slashPos + 1 + pickerQuery.length)
+      setText(before + after)
+    }
+    setLinkedTask(task)
+    closePicker()
+  }
+
+  function clearLinkedTask() {
+    setLinkedTask(null)
+  }
+
   async function handleSend() {
     const body = text.trim()
-    if (!body || sending) return
+    if ((!body && !linkedTask) || sending) return
+    // If only a linked task (empty text), use task title as body
+    const finalBody = body || (linkedTask ? linkedTask.title : '')
     setSending(true)
     setText('')
+    const taskToSend = linkedTask
+    setLinkedTask(null)
     try {
-      const msg = await chatApi.send(channelId, body)
+      const msg = await chatApi.send(channelId, finalBody, taskToSend?.id)
       onSent(msg)
     } catch (e) {
       console.error('Send failed', e)
-      setText(body) // restore on failure
+      setText(finalBody)
+      setLinkedTask(taskToSend)
     } finally {
       setSending(false)
       textareaRef.current?.focus()
@@ -563,6 +713,35 @@ function MessageInput({
 
   return (
     <div className="shrink-0 border-t border-ios-gray-5 bg-white px-4 py-3">
+      {/* Task picker popover */}
+      <div className="relative">
+        {pickerOpen && (
+          <TaskPickerPopover
+            query={pickerQuery}
+            tasks={allTasks}
+            onSelect={handleTaskSelect}
+            onClose={closePicker}
+          />
+        )}
+      </div>
+
+      {/* Linked task preview chip */}
+      {linkedTask && (
+        <div className="flex items-center gap-2 mb-2 px-0.5">
+          <div className="flex items-center gap-2 bg-[var(--ws-color-light,#e8f4ff)] border border-[var(--ws-color,#007AFF)]/30 rounded-xl px-3 py-1.5 max-w-xs">
+            <Circle size={9} className={cn('shrink-0', PRIORITY_COLOR[linkedTask.priority])} fill="currentColor" />
+            <span className="text-xs font-medium text-[var(--ws-color,#007AFF)] truncate">{linkedTask.title}</span>
+            <button
+              onClick={clearLinkedTask}
+              className="shrink-0 text-[var(--ws-color,#007AFF)] hover:text-ios-red transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </div>
+          <span className="text-[11px] text-ios-gray-3">Task will be attached to this message</span>
+        </div>
+      )}
+
       <div className="flex items-end gap-2">
         {/* File attachment */}
         <button
@@ -585,23 +764,18 @@ function MessageInput({
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type / to attach a task · Enter to send'}
           rows={1}
           className="flex-1 resize-none rounded-2xl border border-ios-gray-4 bg-ios-gray-6 px-3.5 py-2 text-sm text-ios-label placeholder:text-ios-gray-3 focus:outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors leading-relaxed max-h-32 overflow-y-auto"
           style={{ minHeight: '38px' }}
-          onInput={e => {
-            const el = e.currentTarget
-            el.style.height = 'auto'
-            el.style.height = Math.min(el.scrollHeight, 128) + 'px'
-          }}
         />
 
         {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={!text.trim() || sending}
+          disabled={(!text.trim() && !linkedTask) || sending}
           className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
           title="Send"
         >
@@ -722,6 +896,7 @@ export function ChatView() {
   const [activeChannel, setActiveChannel] = useState<ChatChannel | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [users, setUsers] = useState<Map<string, AppUser>>(new Map())
+  const [allTasks, setAllTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -740,6 +915,14 @@ export function ChatView() {
       setUsers(new Map(list.map(u => [u.id, u])))
     }).catch(() => {})
   }, [])
+
+  // Load tasks for task picker (refresh when workspace changes)
+  useEffect(() => {
+    if (!workspaceId) return
+    tasksApi.list({ workspaceId }).then(({ tasks: list }) => {
+      setAllTasks(list)
+    }).catch(() => {})
+  }, [workspaceId])
 
   // Load channels when workspace changes
   useEffect(() => {
@@ -963,7 +1146,9 @@ export function ChatView() {
               {/* Message input */}
               <MessageInput
                 channelId={activeChannel.id}
+                workspaceId={workspaceId}
                 currentUserName={currentUserName}
+                allTasks={allTasks}
                 onSent={handleMessageSent}
                 onFileUploaded={handleMessageSent}
               />
