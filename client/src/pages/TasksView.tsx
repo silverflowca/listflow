@@ -503,6 +503,14 @@ export function TasksView() {
               <Mic size={14} />
               <span>Recordings</span>
             </Link>
+            <Link
+              to="/chat"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-ios text-xs font-medium text-ios-gray-1 hover:bg-ios-gray-5 transition-colors"
+              title="Go to Chat"
+            >
+              <MessageSquare size={14} />
+              <span>Chat</span>
+            </Link>
             <div className="w-px h-5 bg-ios-gray-5" />
             <button
               onClick={() => setView('list')}
