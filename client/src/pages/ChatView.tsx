@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search } from 'lucide-react'
+import { Hash, Plus, Send, Paperclip, Pin, X, MessageSquare, ExternalLink, Circle, Search, FileText, FileSpreadsheet, File, UploadCloud } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -12,6 +12,27 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useWs } from '@/hooks/useWs'
 import { chat as chatApi, tasks as tasksApi, users as usersApi, type ChatChannel, type ChatMessage, type AppUser, type Task } from '@/lib/api'
 import { cn } from '@/lib/utils'
+
+// ── File helpers ──────────────────────────────────────────────────────────────
+
+function fileIcon(fileType?: string) {
+  if (!fileType) return <File size={20} className="text-ios-gray-2" />
+  if (fileType.includes('pdf')) return <FileText size={20} className="text-ios-red" />
+  if (fileType.includes('sheet') || fileType.includes('excel') || fileType.includes('csv'))
+    return <FileSpreadsheet size={20} className="text-ios-green" />
+  if (fileType.includes('word') || fileType.includes('document'))
+    return <FileText size={20} className="text-ios-blue" />
+  return <File size={20} className="text-ios-gray-2" />
+}
+
+function fileLabel(fileType?: string): string {
+  if (!fileType) return 'File'
+  if (fileType.includes('pdf')) return 'PDF'
+  if (fileType.includes('sheet') || fileType.includes('excel')) return 'Spreadsheet'
+  if (fileType.includes('csv')) return 'CSV'
+  if (fileType.includes('word') || fileType.includes('document')) return 'Document'
+  return 'File'
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -454,19 +475,31 @@ function MessageBubble({
             </a>
           )}
 
-          {/* Non-image file */}
+          {/* Non-image file — rich thumbnail card */}
           {!isImage && msg.file_url && (
             <a
               href={msg.file_url}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                'flex items-center gap-2 mt-1 text-xs underline',
-                isOwn ? 'text-white/80' : 'text-ios-blue'
+                'flex items-center gap-3 mt-2 px-3 py-2.5 rounded-xl transition-colors',
+                isOwn
+                  ? 'bg-white/20 hover:bg-white/30'
+                  : 'bg-ios-gray-6 hover:bg-ios-gray-5 border border-ios-gray-4'
               )}
             >
-              <Paperclip size={12} />
-              {msg.file_name || 'attachment'}
+              <div className={cn('shrink-0 w-9 h-9 rounded-lg flex items-center justify-center', isOwn ? 'bg-white/30' : 'bg-white border border-ios-gray-5')}>
+                {fileIcon(msg.file_type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn('text-xs font-medium truncate', isOwn ? 'text-white' : 'text-ios-label')}>
+                  {msg.file_name || 'attachment'}
+                </p>
+                <p className={cn('text-[11px]', isOwn ? 'text-white/70' : 'text-ios-gray-2')}>
+                  {fileLabel(msg.file_type)} · tap to open
+                </p>
+              </div>
+              <ExternalLink size={13} className={cn('shrink-0', isOwn ? 'text-white/60' : 'text-ios-gray-3')} />
             </a>
           )}
 
@@ -566,6 +599,53 @@ function TaskPickerPopover({
   )
 }
 
+// ── Pending file preview strip ────────────────────────────────────────────────
+
+interface PendingFile {
+  file: File
+  previewUrl: string | null // object URL for images, null for docs
+}
+
+function PendingFileStrip({
+  files,
+  onRemove,
+}: {
+  files: PendingFile[]
+  onRemove: (idx: number) => void
+}) {
+  if (!files.length) return null
+  return (
+    <div className="flex flex-wrap gap-2 mb-2 px-0.5">
+      {files.map((pf, i) => {
+        const isImage = pf.file.type.startsWith('image/')
+        return (
+          <div key={i} className="relative group">
+            {isImage && pf.previewUrl ? (
+              <div className="w-16 h-16 rounded-xl overflow-hidden border border-ios-gray-4 bg-ios-gray-6">
+                <img src={pf.previewUrl} alt={pf.file.name} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center w-16 h-16 rounded-xl border border-ios-gray-4 bg-ios-gray-6 gap-1 px-1">
+                {fileIcon(pf.file.type)}
+                <span className="text-[10px] text-ios-gray-2 text-center leading-tight truncate w-full px-1">
+                  {pf.file.name.length > 10 ? pf.file.name.slice(0, 8) + '…' : pf.file.name}
+                </span>
+              </div>
+            )}
+            <button
+              onMouseDown={e => { e.preventDefault(); onRemove(i) }}
+              className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-ios-gray-1 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ width: 18, height: 18 }}
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Message Input ─────────────────────────────────────────────────────────────
 
 function MessageInput({
@@ -573,6 +653,7 @@ function MessageInput({
   workspaceId,
   currentUserName,
   allTasks,
+  inputRef,
   onSent,
   onFileUploaded,
 }: {
@@ -580,6 +661,7 @@ function MessageInput({
   workspaceId: string
   currentUserName: string
   allTasks: Task[]
+  inputRef?: React.MutableRefObject<{ addFiles: (files: FileList | File[]) => void } | null>
   onSent: (msg: ChatMessage) => void
   onFileUploaded: (msg: ChatMessage) => void
 }) {
@@ -589,26 +671,51 @@ function MessageInput({
   const [linkedTask, setLinkedTask] = useState<Task | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const slashPosRef = useRef<number>(-1) // where '/' was typed
+  const slashPosRef = useRef<number>(-1)
+
+  // Expose addFiles to parent via ref (for drag-and-drop)
+  useEffect(() => {
+    if (inputRef) inputRef.current = { addFiles }
+  })
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => pendingFiles.forEach(pf => pf.previewUrl && URL.revokeObjectURL(pf.previewUrl))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const emitTyping = useCallback(() => {
     chatApi.typing(channelId, currentUserName).catch(() => {})
   }, [channelId, currentUserName])
 
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files)
+    const pending: PendingFile[] = arr.map(f => ({
+      file: f,
+      previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+    }))
+    setPendingFiles(prev => [...prev, ...pending])
+  }
+
+  function removePendingFile(idx: number) {
+    setPendingFiles(prev => {
+      const pf = prev[idx]
+      if (pf.previewUrl) URL.revokeObjectURL(pf.previewUrl)
+      return prev.filter((_, i) => i !== idx)
+    })
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value
     setText(val)
 
-    // Detect '/' at start of word or when picker is already open
     if (pickerOpen) {
-      // Update query: everything after the slash
       const slashPos = slashPosRef.current
       if (slashPos >= 0 && val.length > slashPos) {
         const afterSlash = val.slice(slashPos + 1)
-        // Close if space (word boundary) or backspaced past slash
         if (afterSlash.includes(' ')) {
           setPickerOpen(false)
           slashPosRef.current = -1
@@ -620,7 +727,6 @@ function MessageInput({
         slashPosRef.current = -1
       }
     } else {
-      // Check if last char typed is '/' with nothing or space before it
       const cursor = e.target.selectionStart ?? val.length
       if (val[cursor - 1] === '/' && (cursor === 1 || val[cursor - 2] === ' ' || val[cursor - 2] === '\n')) {
         slashPosRef.current = cursor - 1
@@ -629,7 +735,6 @@ function MessageInput({
       }
     }
 
-    // Auto-resize
     const el = e.target
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 128) + 'px'
@@ -646,9 +751,18 @@ function MessageInput({
       handleSend()
       return
     }
-    // Debounced typing indicator
     if (typingTimeout.current) clearTimeout(typingTimeout.current)
     typingTimeout.current = setTimeout(emitTyping, 400)
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const fileItems = Array.from(items).filter(i => i.kind === 'file')
+    if (!fileItems.length) return
+    e.preventDefault()
+    const files = fileItems.map(i => i.getAsFile()).filter(Boolean) as File[]
+    addFiles(files)
   }
 
   function closePicker() {
@@ -659,7 +773,6 @@ function MessageInput({
   }
 
   function handleTaskSelect(task: Task) {
-    // Remove the '/query' portion from text, replace with a clean mention tag
     const slashPos = slashPosRef.current
     if (slashPos >= 0) {
       const before = text.slice(0, slashPos)
@@ -670,22 +783,37 @@ function MessageInput({
     closePicker()
   }
 
-  function clearLinkedTask() {
-    setLinkedTask(null)
-  }
-
   async function handleSend() {
     const body = text.trim()
-    if ((!body && !linkedTask) || sending) return
-    // If only a linked task (empty text), use task title as body
-    const finalBody = body || (linkedTask ? linkedTask.title : '')
+    const hasContent = body || linkedTask || pendingFiles.length > 0
+    if (!hasContent || sending) return
+
     setSending(true)
-    setText('')
     const taskToSend = linkedTask
+    const filesToSend = [...pendingFiles]
+    const finalBody = body || (linkedTask ? linkedTask.title : '')
+
+    setText('')
     setLinkedTask(null)
+    setPendingFiles([])
+
     try {
-      const msg = await chatApi.send(channelId, finalBody, taskToSend?.id)
-      onSent(msg)
+      // Upload pending files first (each as its own message)
+      for (const pf of filesToSend) {
+        setUploading(true)
+        try {
+          const msg = await chatApi.upload(channelId, pf.file)
+          onFileUploaded(msg)
+        } finally {
+          setUploading(false)
+        }
+      }
+
+      // Send text message (if any text or linked task)
+      if (finalBody) {
+        const msg = await chatApi.send(channelId, finalBody, taskToSend?.id)
+        onSent(msg)
+      }
     } catch (e) {
       console.error('Send failed', e)
       setText(finalBody)
@@ -696,20 +824,14 @@ function MessageInput({
     }
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const msg = await chatApi.upload(channelId, file)
-      onFileUploaded(msg)
-    } catch (err) {
-      console.error('Upload failed', err)
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
+  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (files?.length) addFiles(files)
+    if (fileRef.current) fileRef.current.value = ''
   }
+
+  const canSend = !!(text.trim() || linkedTask || pendingFiles.length > 0)
+  const isBusy = sending || uploading
 
   return (
     <div className="shrink-0 border-t border-ios-gray-5 bg-white px-4 py-3">
@@ -725,6 +847,9 @@ function MessageInput({
         )}
       </div>
 
+      {/* Pending file thumbnails */}
+      <PendingFileStrip files={pendingFiles} onRemove={removePendingFile} />
+
       {/* Linked task preview chip */}
       {linkedTask && (
         <div className="flex items-center gap-2 mb-2 px-0.5">
@@ -732,7 +857,7 @@ function MessageInput({
             <Circle size={9} className={cn('shrink-0', PRIORITY_COLOR[linkedTask.priority])} fill="currentColor" />
             <span className="text-xs font-medium text-[var(--ws-color,#007AFF)] truncate">{linkedTask.title}</span>
             <button
-              onClick={clearLinkedTask}
+              onClick={() => setLinkedTask(null)}
               className="shrink-0 text-[var(--ws-color,#007AFF)] hover:text-ios-red transition-colors"
             >
               <X size={12} />
@@ -743,21 +868,22 @@ function MessageInput({
       )}
 
       <div className="flex items-end gap-2">
-        {/* File attachment */}
+        {/* File attachment button */}
         <button
           onClick={() => fileRef.current?.click()}
-          disabled={uploading}
+          disabled={isBusy}
           className="shrink-0 p-2 rounded-xl text-ios-gray-2 hover:text-ios-blue hover:bg-ios-gray-6 transition-colors"
-          title="Attach file"
+          title="Attach file (or drag & drop / paste)"
         >
           {uploading ? <Spinner size="sm" /> : <Paperclip size={18} />}
         </button>
         <input
           ref={fileRef}
           type="file"
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv"
+          multiple
           className="hidden"
-          onChange={handleFile}
+          onChange={handleFileInput}
         />
 
         {/* Text area */}
@@ -766,7 +892,8 @@ function MessageInput({
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type / to attach a task · Enter to send'}
+          onPaste={handlePaste}
+          placeholder={linkedTask ? 'Add a message (optional)…' : 'Type / to attach a task · paste or drag & drop files'}
           rows={1}
           className="flex-1 resize-none rounded-2xl border border-ios-gray-4 bg-ios-gray-6 px-3.5 py-2 text-sm text-ios-label placeholder:text-ios-gray-3 focus:outline-none focus:border-[var(--ws-color,#007AFF)] focus:bg-white transition-colors leading-relaxed max-h-32 overflow-y-auto"
           style={{ minHeight: '38px' }}
@@ -775,11 +902,11 @@ function MessageInput({
         {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={(!text.trim() && !linkedTask) || sending}
+          disabled={!canSend || isBusy}
           className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-[var(--ws-color,#007AFF)] text-white disabled:opacity-40 hover:opacity-90 transition-opacity"
           title="Send"
         >
-          {sending ? <Spinner size="sm" /> : <Send size={16} />}
+          {isBusy ? <Spinner size="sm" /> : <Send size={16} />}
         </button>
       </div>
     </div>
@@ -903,10 +1030,13 @@ export function ChatView() {
   const [newChannelOpen, setNewChannelOpen] = useState(false)
   const [typingLabel, setTypingLabel] = useState<string | null>(null)
   const [openTask, setOpenTask] = useState<Task | null>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dragCounterRef = useRef(0)
+  const inputRef = useRef<{ addFiles: (files: FileList | File[]) => void } | null>(null)
   const workspaceId = activeWorkspace?.id ?? ''
 
   // Load users once
@@ -1012,6 +1142,31 @@ export function ChatView() {
     setMessages(prev => prev.map(m => m.id === original.id ? { ...m, task_id: taskId } : m))
   }
 
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current++
+    if (e.dataTransfer.types.includes('Files')) setDragOver(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) setDragOver(false)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setDragOver(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) inputRef.current?.addFiles(files)
+  }
+
   if (!workspaceId) {
     return (
       <div className="flex flex-col h-full">
@@ -1052,7 +1207,22 @@ export function ChatView() {
         />
 
         {/* Main chat area */}
-        <div className={cn('flex flex-col overflow-hidden bg-ios-gray-6/20', openTask ? 'flex-1' : 'flex-1')}>
+        <div
+          className={cn('flex flex-col overflow-hidden bg-ios-gray-6/20 relative', openTask ? 'flex-1' : 'flex-1')}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          {/* Drag-and-drop overlay */}
+          {dragOver && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--ws-color,#007AFF)]/10 border-2 border-dashed border-[var(--ws-color,#007AFF)] rounded-none pointer-events-none">
+              <UploadCloud size={40} className="text-[var(--ws-color,#007AFF)] mb-3" />
+              <p className="text-sm font-semibold text-[var(--ws-color,#007AFF)]">Drop files to send</p>
+              <p className="text-xs text-[var(--ws-color,#007AFF)]/70 mt-1">Images, PDFs, documents</p>
+            </div>
+          )}
+
           {!activeChannel ? (
             <div className="flex-1 flex items-center justify-center text-ios-gray-3">
               <p className="text-sm">Select a channel</p>
@@ -1149,6 +1319,7 @@ export function ChatView() {
                 workspaceId={workspaceId}
                 currentUserName={currentUserName}
                 allTasks={allTasks}
+                inputRef={inputRef}
                 onSent={handleMessageSent}
                 onFileUploaded={handleMessageSent}
               />
