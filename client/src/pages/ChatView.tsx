@@ -445,7 +445,7 @@ function MessageBubble({
       </div>
 
       {/* Bubble content */}
-      <div className={cn('flex flex-col max-w-[70%]', isOwn ? 'items-end' : 'items-start')}>
+      <div className={cn('flex flex-col max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}>
         {/* Name + time */}
         <div className={cn('flex items-baseline gap-1.5 mb-1', isOwn ? 'flex-row-reverse' : 'flex-row')}>
           <span className="text-xs font-semibold text-ios-label">
@@ -1144,7 +1144,7 @@ function MessageInput({
   const isBusy = sending || uploading
 
   return (
-    <div className="shrink-0 border-t border-ios-gray-5 bg-white px-4 py-3">
+    <div className="shrink-0 border-t border-ios-gray-5 bg-white px-3 sm:px-4 py-2.5 sm:py-3">
       {/* Popovers (task picker / task creator) */}
       <div className="relative">
         {bangOpen && (
@@ -1232,9 +1232,9 @@ function MessageInput({
   )
 }
 
-// ── Channel List ──────────────────────────────────────────────────────────────
+// ── Channel Tab Bar (horizontal) ──────────────────────────────────────────────
 
-function ChannelList({
+function ChannelTabBar({
   channels,
   activeId,
   onSelect,
@@ -1246,34 +1246,30 @@ function ChannelList({
   onNew: () => void
 }) {
   return (
-    <div className="w-48 shrink-0 border-r border-ios-gray-5 flex flex-col bg-ios-gray-6/30 overflow-hidden">
-      <div className="px-3 pt-4 pb-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-ios-gray-2">Channels</span>
-      </div>
-      <div className="flex-1 overflow-y-auto px-1.5 pb-2 space-y-0.5">
+    <div className="shrink-0 border-b border-ios-gray-5 bg-white flex items-center overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1 px-3 py-2 min-w-0">
         {channels.map(ch => (
           <button
             key={ch.id}
             onClick={() => onSelect(ch)}
             className={cn(
-              'w-full flex items-center gap-2 px-2.5 py-2 rounded-ios text-sm transition-colors text-left',
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0',
               activeId === ch.id
-                ? 'font-medium text-[var(--ws-color,#007AFF)] bg-[var(--ws-color-light,#e8f4ff)]'
-                : 'text-ios-secondary hover:bg-ios-gray-5/60'
+                ? 'bg-[var(--ws-color,#007AFF)] text-white'
+                : 'text-ios-secondary bg-ios-gray-6 hover:bg-ios-gray-5'
             )}
           >
-            <Hash size={14} className="shrink-0 opacity-60" />
-            <span className="truncate">{ch.name}</span>
+            <Hash size={11} className="shrink-0 opacity-70" />
+            {ch.name}
           </button>
         ))}
-      </div>
-      <div className="px-1.5 pb-3">
         <button
           onClick={onNew}
-          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-ios text-xs text-ios-gray-2 hover:bg-ios-gray-5/60 hover:text-ios-blue transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs text-ios-gray-2 bg-ios-gray-6 hover:bg-ios-gray-5 hover:text-ios-blue transition-colors shrink-0"
+          title="New Channel"
         >
-          <Plus size={13} />
-          New Channel
+          <Plus size={12} />
+          <span className="hidden sm:inline">New</span>
         </button>
       </div>
     </div>
@@ -1511,23 +1507,24 @@ export function ChatView() {
         accentColor="var(--ws-color,#007AFF)"
         actions={
           <Button size="sm" onClick={() => setNewChannelOpen(true)}>
-            <Plus size={14} className="mr-1" /> Channel
+            <Plus size={14} className="sm:mr-1" />
+            <span className="hidden sm:inline">Channel</span>
           </Button>
         }
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Channel sidebar */}
-        <ChannelList
-          channels={channels}
-          activeId={activeChannel?.id ?? null}
-          onSelect={ch => setActiveChannel(ch)}
-          onNew={() => setNewChannelOpen(true)}
-        />
+      {/* Channel tab bar — horizontal, full width */}
+      <ChannelTabBar
+        channels={channels}
+        activeId={activeChannel?.id ?? null}
+        onSelect={ch => setActiveChannel(ch)}
+        onNew={() => setNewChannelOpen(true)}
+      />
 
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Main chat area */}
         <div
-          className={cn('flex flex-col overflow-hidden bg-ios-gray-6/20 relative', openTask ? 'flex-1' : 'flex-1')}
+          className="flex flex-col flex-1 overflow-hidden bg-ios-gray-6/20 relative min-w-0"
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -1552,7 +1549,7 @@ export function ChatView() {
               <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+                className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3"
               >
                 {/* Load more indicator */}
                 {loadingMore && (
@@ -1646,9 +1643,9 @@ export function ChatView() {
           )}
         </div>
 
-        {/* Task detail panel — slides in on right when a task card is clicked */}
+        {/* Task detail panel — full overlay on mobile, side panel on desktop */}
         {openTask && (
-          <div className="w-[420px] shrink-0 border-l border-ios-gray-5 bg-white flex flex-col overflow-hidden">
+          <div className="absolute inset-0 z-20 bg-white flex flex-col overflow-hidden md:relative md:inset-auto md:z-auto md:w-[400px] md:shrink-0 md:border-l md:border-ios-gray-5">
             <TaskDetailPanel
               task={openTask}
               onClose={() => setOpenTask(null)}
