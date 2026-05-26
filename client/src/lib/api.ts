@@ -54,7 +54,7 @@ export interface Task {
   priority: 'low' | 'medium' | 'high' | 'urgent'
   assignee_ids: string[]; notify_user_ids: string[]
   parent_task_id?: string; due_date?: string; labels: string[]
-  effort_points?: string
+  effort_points?: string; task_number?: number
   created_by: string; position: number; created_at: string; updated_at: string
   subtasks?: Subtask[]; comments?: Comment[]
 }
@@ -185,6 +185,7 @@ export const tasks = {
     return get<{ tasks: Task[] }>(`/api/tasks?${qs}`)
   },
   get: (id: string) => get<Task>(`/api/tasks/${id}`),
+  getMany: (ids: string[]) => get<{ tasks: Task[] }>(`/api/tasks?ids=${ids.join(',')}`),
   create: (b: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'subtasks' | 'comments' | 'workspace_id'> & { workspaceId: string }) => post<Task>('/api/tasks', b),
   update: (id: string, b: Partial<Task>) => patch<Task>(`/api/tasks/${id}`, b),
   delete: (id: string) => del(`/api/tasks/${id}`),

@@ -55,3 +55,14 @@ export const STATUS_LABELS = {
   done: 'Done',
   cancelled: 'Cancelled',
 } as const
+
+/**
+ * Generate a human-readable task ID: up to 3 initials from the workspace
+ * name + zero-padded task_number. e.g. "Kingdom Dev Team" + 42 → "KDT042"
+ */
+export function taskShortId(workspaceName: string, taskNumber: number | undefined): string {
+  if (!taskNumber) return ''
+  const initials = workspaceName.trim().split(/\s+/)
+    .map(w => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+  return `${initials}${String(taskNumber).padStart(3, '0')}`
+}

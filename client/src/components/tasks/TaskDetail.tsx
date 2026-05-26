@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Plus, Trash2, Mic, MicOff, Upload, ChevronDown, ChevronUp, Share2, Check, MessageSquare, Bell, BellOff, User, UserPlus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { cn } from '@/lib/utils'
+import { cn, taskShortId } from '@/lib/utils'
 import { tasks as tasksApi, users as usersApi, audio as audioApi, type Task, type Subtask, type Comment, type AudioRecording, type AppUser } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -97,10 +97,12 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
   const toggleMyNotify = () => authUser && toggleNotify(authUser.id)
 
   const handleShare = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`)
+    navigator.clipboard.writeText(`${window.location.origin}/share?ids=${task.id}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const shortId = taskShortId(activeWorkspace?.name ?? '', task.task_number)
 
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -241,7 +243,12 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
       <div className="w-full max-w-lg bg-white shadow-ios-lg flex flex-col overflow-hidden animate-slide-up sm:animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-ios-gray-5 shrink-0">
-          <StatusBadge status={task.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={task.status} />
+            {shortId && (
+              <span className="text-xs font-mono text-ios-gray-2 bg-ios-gray-6 px-2 py-0.5 rounded-md">{shortId}</span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={toggleMyNotify}

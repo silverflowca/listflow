@@ -7,6 +7,7 @@ import { createServer } from 'http'
 
 import { loadConfigCache } from './lib/config.js'
 import { initWss } from './lib/ws.js'
+import { lf } from './db/client.js'
 
 import workspacesRouter from './routes/workspaces.js'
 import pagesRouter from './routes/pages.js'
@@ -47,6 +48,67 @@ app.use('*', cors({
 
 app.get('/health', (c) => c.json({ ok: true, service: 'listflow-server', port: PORT }))
 app.get('/ready', (c) => c.json({ ok: true }))
+
+// ── Share page (OG preview for WhatsApp/iMessage) ─────────────────────────────
+// No auth required — only returns public task title + short ID for preview
+
+app.get('/share', async (c) => {
+  const rawIds = c.req.query('ids') ?? ''
+  const taskIds = rawIds.split(',').filter(Boolean).slice(0, 10)
+
+  if (taskIds.length === 0) {
+    return c.html('<!DOCTYPE html><html><head><title>ListFlow</title></head><body><script>location.replace(\'/\')</script></body></html>')
+  }
+
+  // Fetch tasks (no auth — service role client)
+  const { data: tasks } = await (lf('tasks') as any)
+    .select('id, title, task_number, workspace_id')
+    .in('id', taskIds)
+
+  // Fetch workspace names for the tasks found
+  const wsIds = [...new Set((tasks ?? []).map((t: Record<string, unknown>) => t.workspace_id as string))]
+  const { data: workspaces } = await (lf('workspaces') as any)
+    .select('id, name')
+    .in('id', wsIds)
+  const wsMap: Record<string, string> = {}
+  for (const ws of (workspaces ?? [])) wsMap[ws.id] = ws.name
+
+  // Build short IDs and description lines
+  const lines = (tasks ?? []).map((t: Record<string, unknown>) => {
+    const wsName: string = wsMap[t.workspace_id as string] ?? ''
+    const initials = wsName.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+    const shortId = t.task_number ? `${initials}${String(t.task_number).padStart(3, '0')}` : ''
+    return shortId ? `${shortId} · ${t.title}` : String(t.title)
+  })
+
+  const count = lines.length
+  const titleText = count === 1 ? '1 Task shared with you' : `${count} Tasks shared with you`
+  const descText = lines.join('\n')
+  const appUrl = `/tasks?ids=${taskIds.join(',')}`
+  const origin = c.req.header('origin') ?? ORIGIN
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${titleText}</title>
+  <meta property="og:title" content="${titleText}" />
+  <meta property="og:description" content="${descText.replace(/"/g, '&quot;')}" />
+  <meta property="og:url" content="${origin}${appUrl}" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="${titleText}" />
+  <meta name="twitter:description" content="${descText.replace(/"/g, '&quot;')}" />
+  <meta http-equiv="refresh" content="0;url=${appUrl}" />
+</head>
+<body>
+  <p style="font-family:sans-serif;padding:2rem">${lines.map((l: string) => `<strong>${l}</strong>`).join('<br/>')}</p>
+  <script>location.replace('${appUrl}')</script>
+</body>
+</html>`
+
+  return c.html(html)
+})
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 

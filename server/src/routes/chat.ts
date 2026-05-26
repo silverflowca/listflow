@@ -239,7 +239,7 @@ r.delete('/channels/:id/messages/:msgId', requireAuth, async (c) => {
     }
   }
 
-  emitChatMessageDeleted(msgId, channelId, scope, user.id)
+  emitChatMessageDeleted(msgId!, channelId!, scope, user.id)
   return c.json({ ok: true })
 })
 

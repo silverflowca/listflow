@@ -5,18 +5,28 @@ import { emitTaskCreated, emitTaskUpdated, emitTaskNotification } from '../lib/w
 
 const r = new Hono()
 
-// GET /api/tasks?workspaceId=&workspaceIds=id1,id2&status=&priority=&limit=
+// GET /api/tasks?workspaceId=&workspaceIds=id1,id2&ids=id1,id2&status=&priority=&limit=
 r.get('/', requireAuth, async (c) => {
-  const { workspaceId, workspaceIds, status, priority, databaseId } = c.req.query()
+  const { workspaceId, workspaceIds, ids: idsParam, status, priority, databaseId } = c.req.query()
   const limit = parseInt(c.req.query('limit') ?? '200')
+
+  // ?ids= fetches specific tasks by UUID list (for deep-links / getMany)
+  if (idsParam) {
+    const taskIds = idsParam.split(',').filter(Boolean).slice(0, 50)
+    const { data, error } = await (lf('tasks') as any)
+      .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
+      .in('id', taskIds)
+    if (error) return c.json({ error: error.message }, 500)
+    return c.json({ tasks: data ?? [] })
+  }
 
   if (!workspaceId && !workspaceIds) return c.json({ error: 'workspaceId required' }, 400)
 
-  const ids = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId!]
+  const wsIds = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId!]
 
   let q = (lf('tasks') as any)
     .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
-    .in('workspace_id', ids)
+    .in('workspace_id', wsIds)
     .order('position', { ascending: true })
     .limit(limit)
 

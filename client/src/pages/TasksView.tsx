@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare, FileText, Mic, Share2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Plus, Search, X, ChevronDown, LayoutGrid, List, SlidersHorizontal, Calendar, CheckSquare, MessageSquare, FileText, Mic, Share2, Link2 } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { useWorkspace, workspacePalette } from '@/contexts/WorkspaceContext'
 import { useWs } from '@/hooks/useWs'
 import { tasks as tasksApi, type Task } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
+import { formatDate, taskShortId } from '@/lib/utils'
 
 // ── Filter types ──────────────────────────────────────────────────────────────
 
@@ -51,22 +51,34 @@ const PRIORITY_DOT: Record<Task['priority'], string> = {
 interface TaskRowProps {
   task: Task
   workspaceList: import('@/lib/api').Workspace[]
+  selected: boolean
+  anySelected: boolean
   onClick: () => void
+  onSelect: (e: React.MouseEvent) => void
   onShare: () => void
 }
 
-function TaskRow({ task, workspaceList, onClick, onShare }: TaskRowProps) {
+function TaskRow({ task, workspaceList, selected, anySelected, onClick, onSelect, onShare }: TaskRowProps) {
   const completedSubs = task.subtasks?.filter(s => s.completed).length ?? 0
   const totalSubs = task.subtasks?.length ?? 0
   const ws = workspaceList.find(w => w.id === task.workspace_id)
   const palette = workspacePalette(ws ?? null)
   const dotCls = PRIORITY_DOT[task.priority]
+  const shortId = taskShortId(ws?.name ?? '', task.task_number)
 
   return (
     <div
       onClick={onClick}
-      className="group flex items-center gap-3 bg-white rounded-ios px-4 py-3 shadow-ios cursor-pointer hover:shadow-ios-md transition-all duration-150 border border-transparent hover:border-ios-gray-4"
+      className={`group flex items-center gap-3 bg-white rounded-ios px-4 py-3 shadow-ios cursor-pointer hover:shadow-ios-md transition-all duration-150 border ${selected ? 'border-[var(--ws-color,#007AFF)] bg-[var(--ws-color-light,rgba(0,122,255,0.06))]' : 'border-transparent hover:border-ios-gray-4'}`}
     >
+      {/* Checkbox — visible on hover or when any task is selected */}
+      <span
+        onClick={onSelect}
+        className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center cursor-pointer transition-all ${selected ? 'border-[var(--ws-color,#007AFF)] bg-[var(--ws-color,#007AFF)]' : 'border-ios-gray-4 bg-white'} ${anySelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+      >
+        {selected && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+      </span>
+
       {/* Priority dot */}
       <span
         className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotCls}`}
@@ -79,9 +91,14 @@ function TaskRow({ task, workspaceList, onClick, onShare }: TaskRowProps) {
         style={{ backgroundColor: palette.color, opacity: 0.7 }}
       />
 
-      {/* Title */}
+      {/* Short ID + Title */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ios-label truncate">{task.title}</p>
+        <div className="flex items-baseline gap-1.5">
+          {shortId && (
+            <span className="text-[10px] font-mono text-ios-gray-2 shrink-0">{shortId}</span>
+          )}
+          <p className="text-sm font-medium text-ios-label truncate">{task.title}</p>
+        </div>
         {task.description && (
           <p className="text-xs text-ios-gray-1 truncate mt-0.5">{task.description}</p>
         )}
@@ -462,12 +479,17 @@ function PriorityFilter({
 export function TasksView() {
   const { workspaceList, activeWorkspace, activeDescendantIds } = useWorkspace()
   const { subscribe } = useWs()
+  const [searchParams] = useSearchParams()
 
   // All tasks across all workspaces
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [view, setView] = useState<'list' | 'board'>('list')
+  // Multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [copyLinkToast, setCopyLinkToast] = useState(false)
+  const firstHighlightRef = useRef<HTMLDivElement>(null)
 
   // Filters
   const [search, setSearch] = useState('')
@@ -507,6 +529,24 @@ export function TasksView() {
   }, [workspaceList])
 
   useEffect(() => { load() }, [load])
+
+  // Deep-link: ?ids=id1,id2 or ?task=id — highlight/open linked tasks
+  useEffect(() => {
+    const idsParam = searchParams.get('ids')
+    const taskParam = searchParams.get('task')
+    if (!idsParam && !taskParam) return
+    if (allTasks.length === 0) return // wait for tasks to load
+
+    if (idsParam) {
+      const ids = idsParam.split(',').filter(Boolean)
+      setSelectedIds(new Set(ids))
+      // Scroll first matched task into view (after render)
+      setTimeout(() => firstHighlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+    } else if (taskParam) {
+      const found = allTasks.find(t => t.id === taskParam)
+      if (found) setSelectedTask(found)
+    }
+  }, [searchParams, allTasks])
 
   // Set default create workspace
   useEffect(() => {
@@ -790,17 +830,32 @@ export function TasksView() {
                 {hasFilters ? 'No tasks match the current filters' : 'No tasks yet — create one to get started'}
               </div>
             ) : (
-              filtered.map(task => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  workspaceList={workspaceList}
-                  onClick={() => setSelectedTask(task)}
-                  onShare={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/tasks?task=${task.id}`)
-                  }}
-                />
-              ))
+              filtered.map((task, idx) => {
+                const isSelected = selectedIds.has(task.id)
+                const isFirstHighlighted = isSelected && idx === filtered.findIndex(t => selectedIds.has(t.id))
+                return (
+                  <div key={task.id} ref={isFirstHighlighted ? firstHighlightRef : undefined}>
+                    <TaskRow
+                      task={task}
+                      workspaceList={workspaceList}
+                      selected={isSelected}
+                      anySelected={selectedIds.size > 0}
+                      onClick={() => setSelectedTask(task)}
+                      onSelect={(e) => {
+                        e.stopPropagation()
+                        setSelectedIds(prev => {
+                          const next = new Set(prev)
+                          next.has(task.id) ? next.delete(task.id) : next.add(task.id)
+                          return next
+                        })
+                      }}
+                      onShare={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/share?ids=${task.id}`)
+                      }}
+                    />
+                  </div>
+                )
+              })
             )}
           </div>
         ) : (
@@ -812,6 +867,33 @@ export function TasksView() {
           />
         )}
       </div>
+
+      {/* Floating multi-select action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-ios-label text-white px-4 py-3 rounded-2xl shadow-ios-lg">
+          <span className="text-sm font-medium">{selectedIds.size} task{selectedIds.size !== 1 ? 's' : ''} selected</span>
+          <div className="w-px h-4 bg-white/30" />
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/share?ids=${[...selectedIds].join(',')}`
+              navigator.clipboard.writeText(url)
+              setCopyLinkToast(true)
+              setTimeout(() => setCopyLinkToast(false), 2500)
+            }}
+            className="flex items-center gap-1.5 text-sm font-medium hover:text-ios-blue transition-colors"
+          >
+            <Link2 size={15} />
+            {copyLinkToast ? 'Copied!' : 'Copy link'}
+          </button>
+          <div className="w-px h-4 bg-white/30" />
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Create modal */}
       <Modal
