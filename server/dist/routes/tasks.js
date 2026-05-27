@@ -1,17 +1,28 @@
 import { Hono } from 'hono';
 import { lf } from '../db/client.js';
 import { requireAuth } from '../middleware/auth.js';
-import { emitTaskCreated, emitTaskUpdated } from '../lib/ws.js';
+import { emitTaskCreated, emitTaskUpdated, emitTaskNotification } from '../lib/ws.js';
 const r = new Hono();
-// GET /api/tasks?workspaceId=&status=&priority=&limit=
+// GET /api/tasks?workspaceId=&workspaceIds=id1,id2&ids=id1,id2&status=&priority=&limit=
 r.get('/', requireAuth, async (c) => {
-    const { workspaceId, status, priority, databaseId } = c.req.query();
+    const { workspaceId, workspaceIds, ids: idsParam, status, priority, databaseId } = c.req.query();
     const limit = parseInt(c.req.query('limit') ?? '200');
-    if (!workspaceId)
+    // ?ids= fetches specific tasks by UUID list (for deep-links / getMany)
+    if (idsParam) {
+        const taskIds = idsParam.split(',').filter(Boolean).slice(0, 50);
+        const { data, error } = await lf('tasks')
+            .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
+            .in('id', taskIds);
+        if (error)
+            return c.json({ error: error.message }, 500);
+        return c.json({ tasks: data ?? [] });
+    }
+    if (!workspaceId && !workspaceIds)
         return c.json({ error: 'workspaceId required' }, 400);
+    const wsIds = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId];
     let q = lf('tasks')
         .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
-        .eq('workspace_id', workspaceId)
+        .in('workspace_id', wsIds)
         .order('position', { ascending: true })
         .limit(limit);
     if (status)
@@ -63,8 +74,9 @@ r.post('/', requireAuth, async (c) => {
 });
 // PATCH /api/tasks/:id
 r.patch('/:id', requireAuth, async (c) => {
+    const user = c.get('user');
     const body = await c.req.json();
-    const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id'];
+    const allowed = ['title', 'description', 'status', 'priority', 'assignee_ids', 'notify_user_ids', 'due_date', 'labels', 'position', 'parent_task_id', 'database_id', 'effort_points'];
     const updates = {};
     for (const k of allowed)
         if (body[k] !== undefined)
@@ -77,6 +89,11 @@ r.patch('/:id', requireAuth, async (c) => {
     if (error)
         return c.json({ error: error.message }, 500);
     emitTaskUpdated(data);
+    // Notify watchers (if task has notify_user_ids and it wasn't just a watcher-list change)
+    const notifyIds = Array.isArray(data.notify_user_ids) ? data.notify_user_ids : [];
+    if (notifyIds.length > 0 && !('notify_user_ids' in updates && Object.keys(updates).length === 1)) {
+        emitTaskNotification(data, user.id);
+    }
     return c.json(data);
 });
 // DELETE /api/tasks/:id

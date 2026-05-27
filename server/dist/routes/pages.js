@@ -2,14 +2,16 @@ import { Hono } from 'hono';
 import { lf } from '../db/client.js';
 import { requireAuth } from '../middleware/auth.js';
 const r = new Hono();
-// GET /api/pages?workspaceId=
+// GET /api/pages?workspaceId=&workspaceIds=id1,id2
 r.get('/', requireAuth, async (c) => {
     const workspaceId = c.req.query('workspaceId');
-    if (!workspaceId)
+    const workspaceIds = c.req.query('workspaceIds');
+    if (!workspaceId && !workspaceIds)
         return c.json({ error: 'workspaceId required' }, 400);
+    const ids = workspaceIds ? workspaceIds.split(',').filter(Boolean) : [workspaceId];
     const { data, error } = await lf('pages')
         .select('*')
-        .eq('workspace_id', workspaceId)
+        .in('workspace_id', ids)
         .order('position', { ascending: true });
     if (error)
         return c.json({ error: error.message }, 500);

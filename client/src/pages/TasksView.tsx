@@ -539,7 +539,17 @@ export function TasksView() {
 
     if (idsParam) {
       const ids = idsParam.split(',').filter(Boolean)
-      setSelectedIds(new Set(ids))
+      // Resolve short IDs (e.g. CS003) to UUIDs using loaded tasks
+      const SHORT_ID_RE = /^[A-Z]{1,3}\d+$/
+      const resolved = ids.map(id => {
+        if (!SHORT_ID_RE.test(id)) return id // already a UUID
+        const task = allTasks.find(t => {
+          const ws = workspaceList.find(w => w.id === t.workspace_id)
+          return taskShortId(ws?.name ?? '', t.task_number) === id
+        })
+        return task?.id ?? id
+      })
+      setSelectedIds(new Set(resolved))
       // Scroll first matched task into view (after render)
       setTimeout(() => firstHighlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
     } else if (taskParam) {

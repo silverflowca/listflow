@@ -10,8 +10,10 @@ r.get('/', requireAuth, async (c) => {
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: true });
-    if (e1)
+    if (e1) {
+        console.error('[workspaces/list] e1:', JSON.stringify(e1));
         return c.json({ error: e1.message }, 500);
+    }
     // 2. Workspaces the user is a member of (but doesn't own)
     const { data: memberRows, error: e2 } = await lf('workspace_members')
         .select('workspace_id')
@@ -44,7 +46,7 @@ r.get('/:id', requireAuth, async (c) => {
         return c.json({ error: 'Not found' }, 404);
     return c.json(data);
 });
-// POST /api/workspaces — create workspace
+// POST /api/workspaces — create workspace (or subfolder with parent_id)
 r.post('/', requireAuth, async (c) => {
     const user = c.get('user');
     const body = await c.req.json();
@@ -55,6 +57,7 @@ r.post('/', requireAuth, async (c) => {
         owner_id: user.id,
         icon: body.icon ?? null,
         description: body.description ?? null,
+        parent_id: body.parent_id ?? null,
     })
         .select()
         .single();
@@ -71,7 +74,7 @@ r.post('/', requireAuth, async (c) => {
 // PATCH /api/workspaces/:id
 r.patch('/:id', requireAuth, async (c) => {
     const body = await c.req.json();
-    const allowed = ['name', 'icon', 'description'];
+    const allowed = ['name', 'icon', 'description', 'parent_id'];
     const updates = {};
     for (const k of allowed)
         if (body[k] !== undefined)
