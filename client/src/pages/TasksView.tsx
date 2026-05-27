@@ -851,7 +851,9 @@ export function TasksView() {
                         })
                       }}
                       onShare={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/share?ids=${task.id}`)
+                        const ws = workspaceList.find(w => w.id === task.workspace_id)
+                        const sid = taskShortId(ws?.name ?? '', task.task_number) || task.id
+                        navigator.clipboard.writeText(`${window.location.origin}/share?ids=${sid}`)
                       }}
                     />
                   </div>
@@ -876,7 +878,12 @@ export function TasksView() {
           <div className="w-px h-4 bg-white/30" />
           <button
             onClick={() => {
-              const url = `${window.location.origin}/share?ids=${[...selectedIds].join(',')}`
+              const shortIds = [...selectedIds].map(id => {
+                const t = allTasks.find(t => t.id === id)
+                const ws = workspaceList.find(w => w.id === t?.workspace_id)
+                return taskShortId(ws?.name ?? '', t?.task_number) || id
+              })
+              const url = `${window.location.origin}/share?ids=${shortIds.join(',')}`
               navigator.clipboard.writeText(url)
               setCopyLinkToast(true)
               setTimeout(() => setCopyLinkToast(false), 2500)

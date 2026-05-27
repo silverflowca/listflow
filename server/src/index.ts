@@ -52,39 +52,103 @@ app.get('/ready', (c) => c.json({ ok: true }))
 // ── Share page (OG preview for WhatsApp/iMessage) ─────────────────────────────
 // No auth required — only returns public task title + short ID for preview
 
+// Helper: compute initials from workspace name (same logic as client taskShortId)
+function wsInitials(name: string): string {
+  return name.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+}
+
+// Short ID pattern: 1-3 uppercase letters followed by digits (e.g. KDT042, AB7)
+const SHORT_ID_RE = /^[A-Z]{1,3}\d+$/
+
 app.get('/share', async (c) => {
   const rawIds = c.req.query('ids') ?? ''
-  const taskIds = rawIds.split(',').filter(Boolean).slice(0, 10)
+  const params = rawIds.split(',').map(s => s.trim()).filter(Boolean).slice(0, 10)
 
-  if (taskIds.length === 0) {
+  if (params.length === 0) {
     return c.html('<!DOCTYPE html><html><head><title>ListFlow</title></head><body><script>location.replace(\'/\')</script></body></html>')
   }
 
-  // Fetch tasks (no auth — service role client)
-  const { data: tasks } = await (lf('tasks') as any)
-    .select('id, title, task_number, workspace_id')
-    .in('id', taskIds)
+  // Resolve short IDs (e.g. KDT042) to UUIDs if needed
+  let tasks: Record<string, unknown>[] = []
 
-  // Fetch workspace names for the tasks found
-  const wsIds = [...new Set((tasks ?? []).map((t: Record<string, unknown>) => t.workspace_id as string))]
-  const { data: workspaces } = await (lf('workspaces') as any)
-    .select('id, name')
-    .in('id', wsIds)
-  const wsMap: Record<string, string> = {}
-  for (const ws of (workspaces ?? [])) wsMap[ws.id] = ws.name
+  const shortParams = params.filter(p => SHORT_ID_RE.test(p))
+  const uuidParams  = params.filter(p => !SHORT_ID_RE.test(p))
 
-  // Build short IDs and description lines
-  const lines = (tasks ?? []).map((t: Record<string, unknown>) => {
+  if (shortParams.length > 0) {
+    // Need all workspaces to match initials, then filter by task_number
+    const { data: allWs } = await (lf('workspaces') as any).select('id, name')
+    const wsAll: { id: string; name: string }[] = allWs ?? []
+
+    // Build lookup: initials → workspace IDs
+    const initialsMap: Record<string, string[]> = {}
+    for (const ws of wsAll) {
+      const init = wsInitials(ws.name)
+      if (!initialsMap[init]) initialsMap[init] = []
+      initialsMap[init].push(ws.id)
+    }
+
+    // Parse each short ID into { initials, taskNumber }
+    const lookups = shortParams.map(p => {
+      const match = p.match(/^([A-Z]{1,3})(\d+)$/)!
+      return { shortId: p, initials: match[1], taskNumber: parseInt(match[2]) }
+    })
+
+    // Fetch matching tasks by (workspace_id IN [...], task_number IN [...])
+    const allInitials = [...new Set(lookups.map(l => l.initials))]
+    const wsIdsForLookup = allInitials.flatMap(init => initialsMap[init] ?? [])
+
+    if (wsIdsForLookup.length > 0) {
+      const allNumbers = lookups.map(l => l.taskNumber)
+      const { data: found } = await (lf('tasks') as any)
+        .select('id, title, task_number, workspace_id')
+        .in('workspace_id', wsIdsForLookup)
+        .in('task_number', allNumbers)
+
+      // Filter to only tasks whose (initials+number) matches a requested short ID
+      for (const t of (found ?? []) as Record<string, unknown>[]) {
+        const ws = wsAll.find((w: { id: string }) => w.id === t.workspace_id)
+        if (!ws) continue
+        const computed = `${wsInitials(ws.name)}${String(t.task_number).padStart(0, '')}`
+        // Match loosely: initials + task_number (number without padding)
+        const init = wsInitials(ws.name)
+        const num = t.task_number as number
+        if (lookups.some(l => l.initials === init && l.taskNumber === num)) {
+          tasks.push(t)
+        }
+      }
+    }
+  }
+
+  if (uuidParams.length > 0) {
+    const { data: found } = await (lf('tasks') as any)
+      .select('id, title, task_number, workspace_id')
+      .in('id', uuidParams)
+    tasks = [...tasks, ...(found ?? [])]
+  }
+
+  // Fetch workspace names
+  const wsIds = [...new Set(tasks.map(t => t.workspace_id as string))]
+  let wsMap: Record<string, string> = {}
+  if (wsIds.length > 0) {
+    const { data: workspaces } = await (lf('workspaces') as any).select('id, name').in('id', wsIds)
+    for (const ws of (workspaces ?? [])) wsMap[ws.id] = ws.name
+  }
+
+  // Build display lines + short IDs for redirect
+  const taskShortIds: string[] = []
+  const lines = tasks.map((t: Record<string, unknown>) => {
     const wsName: string = wsMap[t.workspace_id as string] ?? ''
-    const initials = wsName.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+    const initials = wsInitials(wsName)
     const shortId = t.task_number ? `${initials}${String(t.task_number).padStart(3, '0')}` : ''
+    taskShortIds.push(shortId || (t.id as string))
     return shortId ? `${shortId} · ${t.title}` : String(t.title)
   })
 
   const count = lines.length
   const titleText = count === 1 ? '1 Task shared with you' : `${count} Tasks shared with you`
   const descText = lines.join('\n')
-  const appUrl = `/tasks?ids=${taskIds.join(',')}`
+  // Redirect uses short IDs so the app URL is also clean
+  const appUrl = `/tasks?ids=${taskShortIds.join(',')}`
   const origin = c.req.header('origin') ?? ORIGIN
 
   const html = `<!DOCTYPE html>
@@ -94,7 +158,7 @@ app.get('/share', async (c) => {
   <title>${titleText}</title>
   <meta property="og:title" content="${titleText}" />
   <meta property="og:description" content="${descText.replace(/"/g, '&quot;')}" />
-  <meta property="og:url" content="${origin}${appUrl}" />
+  <meta property="og:url" content="${origin}/share?ids=${params.join(',')}" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="${titleText}" />

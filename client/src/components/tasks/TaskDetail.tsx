@@ -96,13 +96,14 @@ export function TaskDetail({ task, onClose, onUpdate, onDelete }: TaskDetailProp
   const iAmNotified = authUser ? notifyIds.includes(authUser.id) : false
   const toggleMyNotify = () => authUser && toggleNotify(authUser.id)
 
+  const shortId = taskShortId(activeWorkspace?.name ?? '', task.task_number)
+
   const handleShare = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/share?ids=${task.id}`)
+    const param = shortId || task.id
+    navigator.clipboard.writeText(`${window.location.origin}/share?ids=${param}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
-  const shortId = taskShortId(activeWorkspace?.name ?? '', task.task_number)
 
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])

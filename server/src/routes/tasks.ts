@@ -10,12 +10,51 @@ r.get('/', requireAuth, async (c) => {
   const { workspaceId, workspaceIds, ids: idsParam, status, priority, databaseId } = c.req.query()
   const limit = parseInt(c.req.query('limit') ?? '200')
 
-  // ?ids= fetches specific tasks by UUID list (for deep-links / getMany)
+  // ?ids= fetches specific tasks — supports both UUIDs and short IDs (e.g. KDT042)
   if (idsParam) {
-    const taskIds = idsParam.split(',').filter(Boolean).slice(0, 50)
+    const params = idsParam.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50)
+    const SHORT_ID_RE = /^[A-Z]{1,3}\d+$/
+    const shortParams = params.filter(p => SHORT_ID_RE.test(p))
+    const uuidParams  = params.filter(p => !SHORT_ID_RE.test(p))
+
+    let resolvedIds: string[] = [...uuidParams]
+
+    if (shortParams.length > 0) {
+      // Fetch all workspaces to map initials → workspace IDs
+      const { data: allWs } = await (lf('workspaces') as any).select('id, name')
+      const wsAll: { id: string; name: string }[] = allWs ?? []
+      const initialsMap: Record<string, string[]> = {}
+      for (const ws of wsAll) {
+        const init = ws.name.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+        if (!initialsMap[init]) initialsMap[init] = []
+        initialsMap[init].push(ws.id)
+      }
+      const lookups = shortParams.map(p => {
+        const match = p.match(/^([A-Z]{1,3})(\d+)$/)!
+        return { initials: match[1], taskNumber: parseInt(match[2]) }
+      })
+      const wsIdsForLookup = [...new Set(lookups.flatMap(l => initialsMap[l.initials] ?? []))]
+      if (wsIdsForLookup.length > 0) {
+        const allNumbers = lookups.map(l => l.taskNumber)
+        const { data: found } = await (lf('tasks') as any)
+          .select('id, task_number, workspace_id')
+          .in('workspace_id', wsIdsForLookup)
+          .in('task_number', allNumbers)
+        for (const t of (found ?? []) as { id: string; task_number: number; workspace_id: string }[]) {
+          const ws = wsAll.find(w => w.id === t.workspace_id)
+          if (!ws) continue
+          const init = ws.name.trim().split(/\s+/).map((w: string) => w[0]?.toUpperCase() ?? '').join('').slice(0, 3)
+          if (lookups.some(l => l.initials === init && l.taskNumber === t.task_number)) {
+            resolvedIds.push(t.id)
+          }
+        }
+      }
+    }
+
+    if (resolvedIds.length === 0) return c.json({ tasks: [] })
     const { data, error } = await (lf('tasks') as any)
       .select('*, subtasks(id, title, completed, position), comments(id, user_id, content, created_at)')
-      .in('id', taskIds)
+      .in('id', resolvedIds)
     if (error) return c.json({ error: error.message }, 500)
     return c.json({ tasks: data ?? [] })
   }
