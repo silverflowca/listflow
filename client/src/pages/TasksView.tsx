@@ -584,6 +584,7 @@ export function TasksView() {
       priority: form.priority,
       status: 'todo',
       assignee_ids: [],
+      notify_user_ids: [],
       labels: [],
       position: 0,
     })

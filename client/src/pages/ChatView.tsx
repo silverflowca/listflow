@@ -1305,6 +1305,7 @@ function MessageInput({
         priority: bangFields.priority,
         status: 'todo',
         assignee_ids: [],
+        notify_user_ids: [],
         labels: [],
         position: 0,
       })
@@ -1775,7 +1776,7 @@ export function ChatView() {
         ))
       } else {
         // scope=self — only hide for the user who deleted it
-        if (userId === currentUserId) {
+        if (userId === authUser?.id) {
           setMessages(prev => prev.map(m => m.id === messageId
             ? { ...m, deleted_for: [...(m.deleted_for ?? []), userId] }
             : m
@@ -1784,7 +1785,7 @@ export function ChatView() {
       }
     })
     return unsub
-  }, [activeChannel?.id, currentUserId, subscribe])
+  }, [activeChannel?.id, authUser?.id, subscribe])
 
   // WebSocket: typing indicator
   useEffect(() => {
